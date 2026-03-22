@@ -305,6 +305,8 @@
         e.stopPropagation();
         if (activeEditor) return;
         
+        // 편집 시에도 dot이 포함된 텍스트를 그대로 가져오되, 
+        // 입력 로직에서 중복되지 않게 처리되므로 그대로 둡니다.
         const allText = workingData[dateStr].map(ev => ev.text).join('\n');
         const cell = e.currentTarget.closest('.day-cell');
         const container = cell.querySelector('.events-container');
@@ -337,10 +339,21 @@
         
         if (val) {
             const lines = val.split('\n').filter(l => l.trim() !== "");
-            workingData[activeEditor.dateStr] = lines.map((line, idx) => ({
-                id: Date.now() + idx,
-                text: line.trim()
-            }));
+            workingData[activeEditor.dateStr] = lines.map((line, idx) => {
+                let text = line.trim();
+                // 이미 '•' 또는 '• '로 시작하지 않는 경우에만 앞에 추가
+                if (!text.startsWith('•')) {
+                    text = '• ' + text;
+                } else if (text.startsWith('•') && !text.startsWith('• ')) {
+                    // '•텍스트' 형태인 경우 '• 텍스트'로 교정
+                    text = '• ' + text.substring(1).trim();
+                }
+                
+                return {
+                    id: Date.now() + idx,
+                    text: text
+                };
+            });
         } else {
             delete workingData[activeEditor.dateStr];
         }
@@ -387,7 +400,10 @@
                 if (weekIdx > 4) weekIdx = 4;
                 if (workingData[dateStr]) {
                     workingData[dateStr].forEach(ev => {
-                        weeks[weekIdx] += `<div class="week-content">• ${ev.text}</div>`;
+                        // 년중 계획표의 dot 표시와 맞추기 위해 
+                        // 이미 데이터에 dot이 있으면 추가하지 않고 없으면 추가하여 표시
+                        const displayText = ev.text.startsWith('•') ? ev.text : `• ${ev.text}`;
+                        weeks[weekIdx] += `<div class="week-content">${displayText}</div>`;
                     });
                 }
             }
