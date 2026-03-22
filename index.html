@@ -15,11 +15,11 @@
         .weekday-header { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); text-align: center; font-weight: 900; background-color: #f1f5f9; border-bottom: 1px solid #e2e8f0; font-size: 0.75rem; }
         .day-cell { min-height: 140px; border-right: 1px solid #e2e8f0; border-bottom: 1px solid #e2e8f0; position: relative; display: flex; flex-direction: column; padding-bottom: 8px; }
         
-        /* 이벤트 아이템 스타일: 배경, 왼쪽 바, 좌우 여백 모두 제거 */
+        /* 이벤트 아이템 스타일: 배경 제거, 좌우 여백 제거, 폰트 크기 축소 */
         .event-item { 
-            font-size: 0.75rem; 
+            font-size: 0.7rem; 
             font-weight: 600; 
-            padding: 2px 0px; /* 좌우 패딩을 0으로 설정 */
+            padding: 2px 0px; 
             cursor: pointer; 
             display: flex; 
             justify-content: space-between; 
@@ -47,7 +47,7 @@
         #yearPlanTable th, #yearPlanTable td { border: 1px solid #cbd5e1; padding: 10px; font-size: 0.85rem; vertical-align: top; }
         #yearPlanTable th { background-color: #f8fafc; font-weight: bold; text-align: center; }
         .month-col { width: 60px; text-align: center !important; vertical-align: middle !important; font-weight: 900; background-color: #f1f5f9; }
-        .week-content { font-size: 0.75rem; line-height: 1.4; color: #334155; }
+        .week-content { font-size: 0.7rem; line-height: 1.4; color: #334155; }
 
         /* 인쇄 최적화 */
         @media print {
@@ -66,7 +66,6 @@
 </head>
 <body class="bg-slate-50">
 
-<!-- 년중 계획표 보기 오버레이 -->
 <div id="yearPlanOverlay">
     <div class="max-w-6xl mx-auto">
         <div class="flex justify-between items-center mb-6 print-header-btns no-print">
@@ -80,11 +79,9 @@
                 </button>
             </div>
         </div>
-
         <div class="text-center mb-6">
             <h1 class="text-3xl font-black text-slate-900 border-b-4 border-slate-900 inline-block pb-1" id="overlayTitle">년중 계획표</h1>
         </div>
-
         <table id="yearPlanTable">
             <thead>
                 <tr>
@@ -96,9 +93,7 @@
                     <th>제5주</th>
                 </tr>
             </thead>
-            <tbody id="yearPlanBody">
-                <!-- JS에서 동적 생성 -->
-            </tbody>
+            <tbody id="yearPlanBody"></tbody>
         </table>
     </div>
 </div>
@@ -111,7 +106,6 @@
 </div>
 
 <div class="w-full min-h-screen flex flex-col no-print">
-    <!-- Header -->
     <div class="px-2 md:px-4 mt-2 md:mt-4">
         <div class="bg-sky-100 p-2.5 md:p-4 rounded-xl border border-sky-200 flex flex-col md:flex-row justify-between items-center gap-4">
             <div class="flex-1 flex items-center gap-4 w-full">
@@ -120,13 +114,13 @@
             </div>
             
             <div class="flex-1 flex justify-center items-center gap-4">
-                <button onclick="changeYear(-1)" class="w-10 h-10 rounded-full bg-white border border-sky-300 text-sky-700 hover:bg-sky-50 flex items-center justify-center shadow-sm transition-all" title="이전 연도">
+                <button onclick="changeYear(-1)" class="w-10 h-10 rounded-full bg-white border border-sky-300 text-sky-700 hover:bg-sky-50 flex items-center justify-center shadow-sm transition-all">
                     <i class="fas fa-angles-left"></i>
                 </button>
                 <div class="bg-white px-8 py-2 rounded-full font-black text-xl border border-sky-300 text-sky-800 shadow-sm">
                     <span id="headerYearDisplay"></span>년 일정표
                 </div>
-                <button onclick="changeYear(1)" class="w-10 h-10 rounded-full bg-white border border-sky-300 text-sky-700 hover:bg-sky-50 flex items-center justify-center shadow-sm transition-all" title="다음 연도">
+                <button onclick="changeYear(1)" class="w-10 h-10 rounded-full bg-white border border-sky-300 text-sky-700 hover:bg-sky-50 flex items-center justify-center shadow-sm transition-all">
                     <i class="fas fa-angles-right"></i>
                 </button>
             </div>
@@ -136,15 +130,14 @@
                     <i class="fas fa-eye"></i> <span>년중 계획표 보기</span>
                 </button>
                 
-                <!-- 월 이동 컨트롤 추가 -->
                 <div class="flex items-center bg-white border border-sky-200 rounded-xl shadow-sm overflow-hidden">
-                    <button onclick="changeMonth(-1)" class="px-3 py-2 hover:bg-sky-50 text-sky-700 border-r border-sky-100 transition-colors">
+                    <button onclick="changeMonth(-1)" class="px-3 py-2 hover:bg-sky-50 text-sky-700 border-r border-sky-100">
                         <i class="fas fa-chevron-left"></i>
                     </button>
-                    <button onclick="goToToday()" class="px-4 py-2 text-xs font-bold text-sky-700 hover:bg-sky-50 transition-colors min-w-[80px]">
+                    <button onclick="goToToday()" class="px-4 py-2 text-xs font-bold text-sky-700 hover:bg-sky-50 min-w-[80px]">
                         <span id="currentMonthLabel">오늘로</span>
                     </button>
-                    <button onclick="changeMonth(1)" class="px-3 py-2 hover:bg-sky-50 text-sky-700 border-l border-sky-100 transition-colors">
+                    <button onclick="changeMonth(1)" class="px-3 py-2 hover:bg-sky-50 text-sky-700 border-l border-sky-100">
                         <i class="fas fa-chevron-right"></i>
                     </button>
                 </div>
@@ -152,7 +145,6 @@
         </div>
     </div>
 
-    <!-- Calendar Area (Screen) -->
     <div class="p-2 md:p-4 w-full flex-grow">
         <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <div class="calendar-container bg-white rounded-xl border shadow-sm overflow-hidden">
@@ -194,7 +186,6 @@
         for (let m = 0; m < 12; m++) {
             const tr = document.createElement('tr');
             tr.innerHTML = `<td class="month-col">${m + 1}월</td>`;
-            
             const weeks = ["", "", "", "", ""];
             const lastDay = new Date(year, m + 1, 0).getDate();
             
@@ -202,24 +193,15 @@
                 const dateStr = `${year}-${String(m + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
                 let weekIdx = Math.floor((d - 1) / 7);
                 if (weekIdx > 4) weekIdx = 4; 
-
                 if (workingData[dateStr]) {
                     workingData[dateStr].forEach(ev => {
                         weeks[weekIdx] += `<div class="week-content">• ${ev.text}</div>`;
                     });
                 }
             }
-
-            weeks.forEach(w => {
-                tr.innerHTML += `<td>${w}</td>`;
-            });
+            weeks.forEach(w => { tr.innerHTML += `<td>${w}</td>`; });
             body.appendChild(tr);
         }
-
-        const trSpecial = document.createElement('tr');
-        trSpecial.innerHTML = `<td class="month-col">정기행사</td><td colspan="5"></td>`;
-        body.appendChild(trSpecial);
-
         document.getElementById('yearPlanOverlay').style.display = 'block';
         document.body.style.overflow = 'hidden'; 
     }
@@ -248,10 +230,10 @@
     }
 
     function syncData() {
-        const currentYear = displayDate.getFullYear();
         if (typeof google !== 'undefined' && google.script && google.script.run) {
             google.script.run.saveAllEvents(workingData);
         } else {
+            const currentYear = displayDate.getFullYear();
             localStorage.setItem(`church_events_${currentYear}`, JSON.stringify(workingData));
         }
     }
@@ -279,7 +261,6 @@
         for (let i = 1; i <= lastDate; i++) {
             const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(i).padStart(2, '0')}`;
             const isToday = today.getFullYear() === year && today.getMonth() === month && today.getDate() === i;
-            
             let eventsHtml = (workingData[dateStr] || []).map(event => `
                 <div class="event-item group text-slate-700" onclick="editEvent(event, '${dateStr}', ${event.id})">
                     <span class="event-text">${event.text}</span>
@@ -358,7 +339,6 @@
     }
 
     function goToToday() { displayDate = new Date(); initData(); }
-
     window.onload = initData;
 </script>
 </body>
