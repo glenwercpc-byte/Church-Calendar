@@ -10,7 +10,6 @@
         @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700;900&display=swap');
         body { font-family: 'Noto Sans KR', sans-serif; background-color: #f8fafc; margin: 0; padding: 0; overflow-x: hidden; padding-bottom: 80px; }
         
-        /* 화면용 달력 스타일 */
         .calendar-grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); width: 100%; }
         .weekday-header { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); text-align: center; font-weight: 900; background-color: #f1f5f9; border-bottom: 1px solid #e2e8f0; font-size: 0.75rem; }
         .day-cell { min-height: 140px; border-right: 1px solid #e2e8f0; border-bottom: 1px solid #e2e8f0; position: relative; display: flex; flex-direction: column; padding-bottom: 8px; }
@@ -18,7 +17,7 @@
         .event-item { 
             font-size: 0.7rem; 
             font-weight: 600; 
-            padding: 2px 0px; 
+            padding: 2px 4px; 
             cursor: pointer; 
             display: flex; 
             justify-content: space-between; 
@@ -30,7 +29,22 @@
         .event-text { flex: 1; line-height: 1.3; }
         .today { background-color: #f0f9ff !important; }
         
-        /* 년중 계획표 오버레이 */
+        .calendar-textarea {
+            width: 100%;
+            min-height: 100px; 
+            font-size: 0.75rem;
+            line-height: 1.4;
+            border: 2px solid #38bdf8;
+            border-radius: 8px;
+            padding: 8px;
+            outline: none;
+            resize: none;
+            overflow: hidden; 
+            background-color: #fff;
+            box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1);
+            z-index: 10;
+        }
+
         #yearPlanOverlay {
             position: fixed; top: 0; left: 0; width: 100%; height: 100%;
             background: white; z-index: 3000; display: none; overflow-y: auto;
@@ -59,14 +73,27 @@
             justify-content: center; align-items: center; font-weight: bold;
             color: #0369a1;
         }
+
+        /* 경고 메시지 스타일 */
+        #urlWarning {
+            display: none;
+            position: fixed; top: 10px; left: 50%; transform: translateX(-50%);
+            background: #fee2e2; color: #b91c1c; padding: 10px 20px;
+            border-radius: 8px; border: 1px solid #fca5a5; z-index: 6000;
+            font-size: 13px; font-weight: bold; text-align: center;
+        }
     </style>
 </head>
 <body class="bg-slate-50">
 
+<div id="urlWarning">
+    <i class="fas fa-exclamation-triangle mr-1"></i> WEB_APP_URL이 설정되지 않았습니다. 코드를 확인해 주세요.
+</div>
+
 <div id="loadingOverlay">
     <div class="flex flex-col items-center gap-2">
         <i class="fas fa-spinner fa-spin text-3xl"></i>
-        <span>데이터를 동기화 중...</span>
+        <span id="loadingText">데이터를 동기화 중...</span>
     </div>
 </div>
 
@@ -142,31 +169,49 @@
 </div>
 
 <script>
-    // [중요] 구글 앱 스크립트를 배포(웹 앱)한 후 생성된 URL을 여기에 넣으세요.
-    const WEB_APP_URL = "https://script.google.com/macros/s/AKfycbxbuaT1Ur25YZGbkX5BV9F2ysl_uPZ9jT0hjyxuodW506STomTJVgcxErGIm45ERDhF/exec";
+    /**
+     * [중요] 구글 앱스크립트 배포 후 생성된 '웹 앱 URL'을 아래 큰따옴표 안에 입력해야 합니다.
+     * 예: "https://script.google.com/macros/s/AKfycb.../exec"
+     */
+    const WEB_APP_URL = "https://script.google.com/macros/s/AKfycbzaPB7jgxadD_OY3e5jzd9H7xOnPsAI-L69ivijc_MTI_RxFSiHXLztg7lHUeYl7TTv/exec"; 
     
     let displayDate = new Date(); 
     let workingData = {}; 
     let activeEditor = null;
     const monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
 
-    function changeYear(offset) { displayDate.setFullYear(displayDate.getFullYear() + offset); initData(); }
-    function changeMonth(offset) { displayDate.setMonth(displayDate.getMonth() + offset); initData(); }
-
     async function initData() {
         const currentYear = displayDate.getFullYear();
         document.getElementById('headerYearDisplay').innerText = currentYear;
         document.getElementById('currentMonthLabel').innerText = monthNames[displayDate.getMonth()];
+        
+        // URL 유효성 검사
+        if (!WEB_APP_URL || !WEB_APP_URL.startsWith('http')) {
+            console.error("WEB_APP_URL이 올바르지 않습니다.");
+            document.getElementById('urlWarning').style.display = 'block';
+            document.getElementById('loadingOverlay').style.display = 'none';
+            // 로컬 데이터로 대체 로드 시도
+            const local = localStorage.getItem(`church_events_${currentYear}`);
+            workingData = local ? JSON.parse(local) : {};
+            renderCalendars();
+            return;
+        }
+
+        document.getElementById('urlWarning').style.display = 'none';
         document.getElementById('loadingOverlay').style.display = 'flex';
         
         try {
-            // 구글 서버로부터 데이터 가져오기 (fetch GET)
-            const response = await fetch(`${WEB_APP_URL}?action=getEvents`);
+            const fetchUrl = `${WEB_APP_URL}?action=getEvents&t=${Date.now()}`;
+            const response = await fetch(fetchUrl, { method: 'GET', redirect: 'follow' });
+            if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
             const result = await response.json();
-            workingData = result.data || {};
+            if (result.status === 'success') {
+                workingData = result.data || {};
+                localStorage.setItem(`church_events_${currentYear}`, JSON.stringify(workingData));
+            }
             renderCalendars();
         } catch (e) {
-            console.warn("Server connection failed, loading from local storage", e);
+            console.error("데이터 로드 실패:", e);
             const local = localStorage.getItem(`church_events_${currentYear}`);
             workingData = local ? JSON.parse(local) : {};
             renderCalendars();
@@ -176,19 +221,25 @@
     }
 
     async function syncData() {
+        if (!WEB_APP_URL || !WEB_APP_URL.startsWith('http')) {
+            alert("서버 연결 URL이 설정되지 않아 브라우저에 임시 저장됩니다.");
+            localStorage.setItem(`church_events_${displayDate.getFullYear()}`, JSON.stringify(workingData));
+            return;
+        }
+
+        document.getElementById('loadingOverlay').style.display = 'flex';
         try {
-            // 구글 서버로 데이터 저장하기 (fetch POST)
-            // Redirect 방지를 위해 mode: 'no-cors'를 쓸 수도 있으나, 현재 서버 코드는 JSON 응답을 주므로 일반 fetch 사용
             await fetch(WEB_APP_URL, {
                 method: 'POST',
-                mode: 'no-cors', // 구글 POST 리다이렉트 대응
+                mode: 'no-cors',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ action: 'saveEvents', data: workingData })
             });
-            console.log("Sync requested");
-        } catch (e) {
-            console.error("Sync failed", e);
             localStorage.setItem(`church_events_${displayDate.getFullYear()}`, JSON.stringify(workingData));
+        } catch (e) {
+            console.error("저장 실패:", e);
+        } finally {
+            setTimeout(() => { document.getElementById('loadingOverlay').style.display = 'none'; }, 500);
         }
     }
 
@@ -235,9 +286,15 @@
     function showInput(dateStr, cell) {
         if (activeEditor) return;
         const textarea = document.createElement('textarea');
-        textarea.className = 'w-full text-[11px] border-2 border-sky-400 rounded p-1.5 mb-2 outline-none';
-        textarea.placeholder = '입력...';
+        textarea.className = 'calendar-textarea';
+        textarea.placeholder = '일정을 입력하세요... (엔터로 구분)';
         textarea.onclick = e => e.stopPropagation();
+        
+        textarea.oninput = function() {
+            this.style.height = 'auto';
+            this.style.height = (this.scrollHeight) + 'px';
+        };
+
         cell.querySelector('.input-area').appendChild(textarea);
         textarea.focus();
         activeEditor = { type: 'new', dateStr, textarea };
@@ -247,50 +304,73 @@
     function editEvent(e, dateStr, eventId) {
         e.stopPropagation();
         if (activeEditor) return;
-        const eventObj = workingData[dateStr].find(ev => ev.id === eventId);
-        const target = e.currentTarget;
+        
+        const allText = workingData[dateStr].map(ev => ev.text).join('\n');
+        const cell = e.currentTarget.closest('.day-cell');
+        const container = cell.querySelector('.events-container');
+        container.style.display = 'none';
+
         const textarea = document.createElement('textarea');
-        textarea.className = 'w-full text-[11px] border-2 border-sky-400 rounded p-1.5 mb-2 outline-none';
-        textarea.value = eventObj.text;
+        textarea.className = 'calendar-textarea';
+        textarea.value = allText;
         textarea.onclick = e => e.stopPropagation();
-        target.style.display = 'none';
-        target.parentElement.insertBefore(textarea, target);
+        
+        textarea.oninput = function() {
+            this.style.height = 'auto';
+            this.style.height = (this.scrollHeight) + 'px';
+        };
+
+        cell.querySelector('.input-area').appendChild(textarea);
         textarea.focus();
-        activeEditor = { type: 'edit', dateStr, eventId, textarea };
+        
+        textarea.style.height = 'auto';
+        textarea.style.height = (textarea.scrollHeight) + 'px';
+
+        activeEditor = { type: 'edit_all', dateStr, textarea, container };
         document.getElementById('controlStatus').innerText = "수정 중";
         document.getElementById('floatingControls').classList.add('show');
-    }
-
-    function deleteEvent(e, dateStr, eventId) {
-        e.stopPropagation();
-        if(!confirm("삭제하시겠습니까?")) return;
-        workingData[dateStr] = workingData[dateStr].filter(ev => ev.id !== eventId);
-        if (!workingData[dateStr].length) delete workingData[dateStr];
-        syncData(); renderCalendars();
     }
 
     function confirmAction() {
         if (!activeEditor) return;
         const val = activeEditor.textarea.value.trim();
-        if (activeEditor.type === 'new' && val) {
-            if (!workingData[activeEditor.dateStr]) workingData[activeEditor.dateStr] = [];
-            workingData[activeEditor.dateStr].push({ id: Date.now(), text: val });
-        } else if (activeEditor.type === 'edit') {
-            const idx = workingData[activeEditor.dateStr].findIndex(ev => ev.id === activeEditor.eventId);
-            if (val) workingData[activeEditor.dateStr][idx].text = val;
-            else workingData[activeEditor.dateStr].splice(idx, 1);
+        
+        if (val) {
+            const lines = val.split('\n').filter(l => l.trim() !== "");
+            workingData[activeEditor.dateStr] = lines.map((line, idx) => ({
+                id: Date.now() + idx,
+                text: line.trim()
+            }));
+        } else {
+            delete workingData[activeEditor.dateStr];
         }
-        syncData(); cancelAction();
+        
+        syncData(); 
+        cancelAction();
     }
 
     function cancelAction() {
-        if (activeEditor) activeEditor.textarea.remove();
+        if (activeEditor) {
+            if (activeEditor.container) activeEditor.container.style.display = 'block';
+            activeEditor.textarea.remove();
+        }
         activeEditor = null;
         document.getElementById('controlStatus').innerText = "작성 중";
         document.getElementById('floatingControls').classList.remove('show');
         renderCalendars();
     }
 
+    function deleteEvent(e, dateStr, eventId) {
+        e.stopPropagation();
+        if(!confirm("이 일정을 삭제하시겠습니까?")) return;
+        workingData[dateStr] = workingData[dateStr].filter(ev => ev.id !== eventId);
+        if (workingData[dateStr].length === 0) delete workingData[dateStr];
+        syncData(); 
+        renderCalendars();
+    }
+
+    function changeYear(offset) { displayDate.setFullYear(displayDate.getFullYear() + offset); initData(); }
+    function changeMonth(offset) { displayDate.setMonth(displayDate.getMonth() + offset); initData(); }
     function showYearPlan() {
         const body = document.getElementById('yearPlanBody');
         body.innerHTML = '';
@@ -316,10 +396,8 @@
         }
         document.getElementById('yearPlanOverlay').style.display = 'block';
     }
-
     function closeYearPlan() { document.getElementById('yearPlanOverlay').style.display = 'none'; }
     function goToToday() { displayDate = new Date(); initData(); }
-
     document.addEventListener('DOMContentLoaded', initData);
 </script>
 </body>
