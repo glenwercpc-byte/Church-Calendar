@@ -30,11 +30,12 @@
         .event-text { flex: 1; line-height: 1.3; }
         .today { background-color: #f0f9ff !important; }
         
-        /* 삭제 확인 팝업 스타일 */
+        /* 삭제 확인 팝업 스타일 수정: 아이콘 상단에 배치 */
         .delete-confirm-pop {
             position: absolute;
             right: 0;
-            top: -5px;
+            bottom: 100%; /* 부모(버튼 컨테이너)의 위쪽으로 배치 */
+            margin-bottom: 5px; /* 약간의 간격 */
             background: white;
             border: 1px solid #fca5a5;
             box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
@@ -210,7 +211,7 @@
     /**
      * [중요] 구글 앱스크립트 배포 후 생성된 '웹 앱 URL'을 아래 큰따옴표 안에 입력해야 합니다.
      */
-    const WEB_APP_URL = "https://script.google.com/macros/s/AKfycbwjHKakfF1PjFM6hPc5qm96AbAuZRIhKgX_4u7N3g0pim6Je0IiPOX4EVaSpZ9ya8F6/exec"; 
+    const WEB_APP_URL = "https://script.google.com/macros/s/AKfycbxHTlhuGvX0u2oMkOx2cciTtF14FRl-Lb2yUb-yMAajJcnonq3S1m69BRWRmAGFs9vV/exec"; 
     
     let displayDate = new Date(); 
     let workingData = {}; 
@@ -336,15 +337,15 @@
         }
     }
 
-    // 삭제 확인 팝업 표시
+    // 삭제 확인 팝업 표시 (위치: 아이콘 상단)
     function askDelete(e, dateStr, eventId) {
         e.stopPropagation();
-        closeAllDeletePopups(); // 기존 팝업들 닫기
+        closeAllDeletePopups(); 
         
         const container = e.currentTarget.parentElement;
         const pop = document.createElement('div');
         pop.className = 'delete-confirm-pop';
-        pop.onclick = (ev) => ev.stopPropagation(); // 팝업 내부 클릭 시 이벤트 전파 차단
+        pop.onclick = (ev) => ev.stopPropagation(); 
         
         pop.innerHTML = `
             <span class="text-[9px] font-bold text-red-600 whitespace-nowrap">삭제?</span>
