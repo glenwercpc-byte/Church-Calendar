@@ -25,10 +25,32 @@
             margin-bottom: 4px;
             word-break: break-all; 
             white-space: normal; 
+            position: relative;
         }
         .event-text { flex: 1; line-height: 1.3; }
         .today { background-color: #f0f9ff !important; }
         
+        /* 삭제 확인 팝업 스타일 */
+        .delete-confirm-pop {
+            position: absolute;
+            right: 0;
+            top: -5px;
+            background: white;
+            border: 1px solid #fca5a5;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+            border-radius: 6px;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            padding: 2px 6px;
+            z-index: 50;
+            animation: fadeIn 0.2s ease-out;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(5px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
         .calendar-textarea {
             width: 100%;
             min-height: 100px; 
@@ -84,7 +106,7 @@
         }
     </style>
 </head>
-<body class="bg-slate-50">
+<body class="bg-slate-50" onclick="closeAllDeletePopups()">
 
 <div id="urlWarning">
     <i class="fas fa-exclamation-triangle mr-1"></i> WEB_APP_URL이 설정되지 않았습니다. 코드를 확인해 주세요.
@@ -269,23 +291,19 @@
         const today = new Date();
         document.getElementById(titleId).textContent = `${year}년 ${monthNames[month]}`;
         
-        // 해당 월의 1일 요일 (0: 일요일, 1: 월요일...)
         const firstDay = new Date(year, month, 1).getDay();
         const lastDate = new Date(year, month + 1, 0).getDate();
         const gridElement = document.getElementById(gridId);
         gridElement.innerHTML = '';
 
-        // 1일 이전의 빈 공간 채우기
         for (let i = 0; i < firstDay; i++) {
             gridElement.innerHTML += `<div class="day-cell bg-slate-50/50 border-r border-b border-slate-200"></div>`;
         }
 
-        // 실제 날짜 렌더링
         for (let i = 1; i <= lastDate; i++) {
             const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(i).padStart(2, '0')}`;
             const isToday = today.getFullYear() === year && today.getMonth() === month && today.getDate() === i;
             
-            // 요일 확인 (0: 일, 6: 토)
             const currentDayOfWeek = new Date(year, month, i).getDay();
             let dayColorClass = "text-slate-500";
             if (currentDayOfWeek === 0) dayColorClass = "text-red-600";
@@ -294,7 +312,11 @@
             let eventsHtml = (workingData[dateStr] || []).map(event => `
                 <div class="event-item group text-slate-700" onclick="editEvent(event, '${dateStr}', ${event.id})">
                     <span class="event-text">${event.text}</span>
-                    <button class="ml-1 text-[10px] text-red-400 opacity-0 group-hover:opacity-100" onclick="deleteEvent(event, '${dateStr}', ${event.id})"><i class="fas fa-times"></i></button>
+                    <div class="relative delete-container">
+                        <button class="ml-1 text-[10px] text-red-400 opacity-0 group-hover:opacity-100 p-1" onclick="askDelete(event, '${dateStr}', ${event.id})">
+                            <i class="fas fa-times"></i>
+                        </button>
+                    </div>
                 </div>
             `).join('');
 
@@ -307,7 +329,6 @@
             `;
         }
         
-        // 마지막 주 빈 공간 채우기 (7열 맞추기)
         const totalCells = firstDay + lastDate;
         const remainCells = (7 - (totalCells % 7)) % 7;
         for (let i = 0; i < remainCells; i++) {
@@ -315,8 +336,41 @@
         }
     }
 
+    // 삭제 확인 팝업 표시
+    function askDelete(e, dateStr, eventId) {
+        e.stopPropagation();
+        closeAllDeletePopups(); // 기존 팝업들 닫기
+        
+        const container = e.currentTarget.parentElement;
+        const pop = document.createElement('div');
+        pop.className = 'delete-confirm-pop';
+        pop.onclick = (ev) => ev.stopPropagation(); // 팝업 내부 클릭 시 이벤트 전파 차단
+        
+        pop.innerHTML = `
+            <span class="text-[9px] font-bold text-red-600 whitespace-nowrap">삭제?</span>
+            <button class="bg-red-500 text-white px-1.5 py-0.5 rounded text-[9px] font-bold" onclick="executeDelete(event, '${dateStr}', ${eventId})">확인</button>
+            <button class="bg-slate-200 text-slate-600 px-1.5 py-0.5 rounded text-[9px] font-bold" onclick="closeAllDeletePopups()">X</button>
+        `;
+        
+        container.appendChild(pop);
+    }
+
+    function closeAllDeletePopups() {
+        const pops = document.querySelectorAll('.delete-confirm-pop');
+        pops.forEach(p => p.remove());
+    }
+
+    function executeDelete(e, dateStr, eventId) {
+        e.stopPropagation();
+        workingData[dateStr] = workingData[dateStr].filter(ev => ev.id !== eventId);
+        if (workingData[dateStr].length === 0) delete workingData[dateStr];
+        syncData(); 
+        renderCalendars();
+    }
+
     function showInput(dateStr, cell) {
         if (activeEditor) return;
+        closeAllDeletePopups();
         const textarea = document.createElement('textarea');
         textarea.className = 'calendar-textarea';
         textarea.placeholder = '일정을 입력하세요...';
@@ -336,6 +390,7 @@
     function editEvent(e, dateStr, eventId) {
         e.stopPropagation();
         if (activeEditor) return;
+        closeAllDeletePopups();
         
         const allText = workingData[dateStr].map(ev => ev.text).join('\n');
         const cell = e.currentTarget.closest('.day-cell');
@@ -401,15 +456,6 @@
         renderCalendars();
     }
 
-    function deleteEvent(e, dateStr, eventId) {
-        e.stopPropagation();
-        if(!confirm("이 일정을 삭제하시겠습니까?")) return;
-        workingData[dateStr] = workingData[dateStr].filter(ev => ev.id !== eventId);
-        if (workingData[dateStr].length === 0) delete workingData[dateStr];
-        syncData(); 
-        renderCalendars();
-    }
-
     function changeYear(offset) { displayDate.setFullYear(displayDate.getFullYear() + offset); initData(); }
     function changeMonth(offset) { displayDate.setMonth(displayDate.getMonth() + offset); initData(); }
     
@@ -425,7 +471,6 @@
             const lastDay = new Date(year, m + 1, 0).getDate();
             for (let d = 1; d <= lastDay; d++) {
                 const dateStr = `${year}-${String(m + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
-                // 실제 주차 계산 (월의 1일 요일 기준)
                 const firstDayOfMonth = new Date(year, m, 1).getDay();
                 let weekIdx = Math.floor((d + firstDayOfMonth - 1) / 7);
                 if (weekIdx > 4) weekIdx = 4;
