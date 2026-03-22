@@ -156,12 +156,28 @@
         <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <div class="calendar-container bg-white rounded-xl border shadow-sm overflow-hidden">
                 <div class="p-5 text-center font-black text-lg bg-slate-50 border-b" id="monthTitle1"></div>
-                <div class="weekday-header"><div class="text-red-600 p-2">SUN</div><div class="p-2">MON</div><div class="p-2">TUE</div><div class="p-2">WED</div><div class="p-2">THU</div><div class="p-2">FRI</div><div class="text-sky-600 p-2">SAT</div></div>
+                <div class="weekday-header">
+                    <div class="text-red-600 p-2">일요일</div>
+                    <div class="p-2">월요일</div>
+                    <div class="p-2">화요일</div>
+                    <div class="p-2">수요일</div>
+                    <div class="p-2">목요일</div>
+                    <div class="p-2">금요일</div>
+                    <div class="text-sky-600 p-2">토요일</div>
+                </div>
                 <div id="calendarDays1" class="calendar-grid"></div>
             </div>
             <div class="calendar-container bg-white rounded-xl border shadow-sm overflow-hidden">
                 <div class="p-5 text-center font-black text-lg bg-slate-50 border-b" id="monthTitle2"></div>
-                <div class="weekday-header"><div class="text-red-600 p-2">SUN</div><div class="p-2">MON</div><div class="p-2">TUE</div><div class="p-2">WED</div><div class="p-2">THU</div><div class="p-2">FRI</div><div class="text-sky-600 p-2">SAT</div></div>
+                <div class="weekday-header">
+                    <div class="text-red-600 p-2">일요일</div>
+                    <div class="p-2">월요일</div>
+                    <div class="p-2">화요일</div>
+                    <div class="p-2">수요일</div>
+                    <div class="p-2">목요일</div>
+                    <div class="p-2">금요일</div>
+                    <div class="text-sky-600 p-2">토요일</div>
+                </div>
                 <div id="calendarDays2" class="calendar-grid"></div>
             </div>
         </div>
@@ -171,26 +187,23 @@
 <script>
     /**
      * [중요] 구글 앱스크립트 배포 후 생성된 '웹 앱 URL'을 아래 큰따옴표 안에 입력해야 합니다.
-     * 예: "https://script.google.com/macros/s/AKfycb.../exec"
      */
-    const WEB_APP_URL = "https://script.google.com/macros/s/AKfycbzaPB7jgxadD_OY3e5jzd9H7xOnPsAI-L69ivijc_MTI_RxFSiHXLztg7lHUeYl7TTv/exec"; 
+    const WEB_APP_URL = "https://script.google.com/macros/s/AKfycbwjHKakfF1PjFM6hPc5qm96AbAuZRIhKgX_4u7N3g0pim6Je0IiPOX4EVaSpZ9ya8F6/exec"; 
     
     let displayDate = new Date(); 
     let workingData = {}; 
     let activeEditor = null;
-    const monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+    const monthNames = ["1월", "2월", "3월", "4월", "5월", "6월", "7월", "8월", "9월", "10월", "11월", "12월"];
 
     async function initData() {
         const currentYear = displayDate.getFullYear();
         document.getElementById('headerYearDisplay').innerText = currentYear;
         document.getElementById('currentMonthLabel').innerText = monthNames[displayDate.getMonth()];
         
-        // URL 유효성 검사
         if (!WEB_APP_URL || !WEB_APP_URL.startsWith('http')) {
             console.error("WEB_APP_URL이 올바르지 않습니다.");
             document.getElementById('urlWarning').style.display = 'block';
             document.getElementById('loadingOverlay').style.display = 'none';
-            // 로컬 데이터로 대체 로드 시도
             const local = localStorage.getItem(`church_events_${currentYear}`);
             workingData = local ? JSON.parse(local) : {};
             renderCalendars();
@@ -222,7 +235,6 @@
 
     async function syncData() {
         if (!WEB_APP_URL || !WEB_APP_URL.startsWith('http')) {
-            alert("서버 연결 URL이 설정되지 않아 브라우저에 임시 저장됩니다.");
             localStorage.setItem(`church_events_${displayDate.getFullYear()}`, JSON.stringify(workingData));
             return;
         }
@@ -246,6 +258,7 @@
     function renderCalendars() {
         const firstMonth = new Date(displayDate.getFullYear(), displayDate.getMonth(), 1);
         renderSingleCalendar(firstMonth, "monthTitle1", "calendarDays1");
+        
         const secondMonth = new Date(displayDate.getFullYear(), displayDate.getMonth() + 1, 1);
         renderSingleCalendar(secondMonth, "monthTitle2", "calendarDays2");
     }
@@ -254,18 +267,30 @@
         const year = dateObj.getFullYear();
         const month = dateObj.getMonth();
         const today = new Date();
-        document.getElementById(titleId).textContent = `${monthNames[month]} ${year}`;
+        document.getElementById(titleId).textContent = `${year}년 ${monthNames[month]}`;
         
+        // 해당 월의 1일 요일 (0: 일요일, 1: 월요일...)
         const firstDay = new Date(year, month, 1).getDay();
         const lastDate = new Date(year, month + 1, 0).getDate();
         const gridElement = document.getElementById(gridId);
         gridElement.innerHTML = '';
 
-        for (let i = 0; i < firstDay; i++) gridElement.innerHTML += `<div class="day-cell bg-slate-50/50"></div>`;
+        // 1일 이전의 빈 공간 채우기
+        for (let i = 0; i < firstDay; i++) {
+            gridElement.innerHTML += `<div class="day-cell bg-slate-50/50 border-r border-b border-slate-200"></div>`;
+        }
 
+        // 실제 날짜 렌더링
         for (let i = 1; i <= lastDate; i++) {
             const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(i).padStart(2, '0')}`;
             const isToday = today.getFullYear() === year && today.getMonth() === month && today.getDate() === i;
+            
+            // 요일 확인 (0: 일, 6: 토)
+            const currentDayOfWeek = new Date(year, month, i).getDay();
+            let dayColorClass = "text-slate-500";
+            if (currentDayOfWeek === 0) dayColorClass = "text-red-600";
+            if (currentDayOfWeek === 6) dayColorClass = "text-sky-600";
+
             let eventsHtml = (workingData[dateStr] || []).map(event => `
                 <div class="event-item group text-slate-700" onclick="editEvent(event, '${dateStr}', ${event.id})">
                     <span class="event-text">${event.text}</span>
@@ -275,11 +300,18 @@
 
             gridElement.innerHTML += `
                 <div class="day-cell group bg-white p-2 hover:bg-slate-50 cursor-pointer ${isToday ? 'today' : ''}" onclick="showInput('${dateStr}', this)">
-                    <div class="text-xs font-bold mb-1"><span class="${isToday ? 'text-sky-600 font-black underline' : 'text-slate-500'}">${i}</span></div>
+                    <div class="text-xs font-bold mb-1"><span class="${isToday ? 'bg-sky-600 text-white px-1.5 py-0.5 rounded-full' : dayColorClass}">${i}</span></div>
                     <div class="input-area"></div>
                     <div class="events-container overflow-y-auto max-h-[120px]">${eventsHtml}</div>
                 </div>
             `;
+        }
+        
+        // 마지막 주 빈 공간 채우기 (7열 맞추기)
+        const totalCells = firstDay + lastDate;
+        const remainCells = (7 - (totalCells % 7)) % 7;
+        for (let i = 0; i < remainCells; i++) {
+            gridElement.innerHTML += `<div class="day-cell bg-slate-50/50 border-r border-b border-slate-200"></div>`;
         }
     }
 
@@ -287,7 +319,7 @@
         if (activeEditor) return;
         const textarea = document.createElement('textarea');
         textarea.className = 'calendar-textarea';
-        textarea.placeholder = '일정을 입력하세요... (엔터로 구분)';
+        textarea.placeholder = '일정을 입력하세요...';
         textarea.onclick = e => e.stopPropagation();
         
         textarea.oninput = function() {
@@ -305,8 +337,6 @@
         e.stopPropagation();
         if (activeEditor) return;
         
-        // 편집 시에도 dot이 포함된 텍스트를 그대로 가져오되, 
-        // 입력 로직에서 중복되지 않게 처리되므로 그대로 둡니다.
         const allText = workingData[dateStr].map(ev => ev.text).join('\n');
         const cell = e.currentTarget.closest('.day-cell');
         const container = cell.querySelector('.events-container');
@@ -341,11 +371,9 @@
             const lines = val.split('\n').filter(l => l.trim() !== "");
             workingData[activeEditor.dateStr] = lines.map((line, idx) => {
                 let text = line.trim();
-                // 이미 '•' 또는 '• '로 시작하지 않는 경우에만 앞에 추가
                 if (!text.startsWith('•')) {
                     text = '• ' + text;
                 } else if (text.startsWith('•') && !text.startsWith('• ')) {
-                    // '•텍스트' 형태인 경우 '• 텍스트'로 교정
                     text = '• ' + text.substring(1).trim();
                 }
                 
@@ -384,6 +412,7 @@
 
     function changeYear(offset) { displayDate.setFullYear(displayDate.getFullYear() + offset); initData(); }
     function changeMonth(offset) { displayDate.setMonth(displayDate.getMonth() + offset); initData(); }
+    
     function showYearPlan() {
         const body = document.getElementById('yearPlanBody');
         body.innerHTML = '';
@@ -396,12 +425,13 @@
             const lastDay = new Date(year, m + 1, 0).getDate();
             for (let d = 1; d <= lastDay; d++) {
                 const dateStr = `${year}-${String(m + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
-                let weekIdx = Math.floor((d - 1) / 7);
+                // 실제 주차 계산 (월의 1일 요일 기준)
+                const firstDayOfMonth = new Date(year, m, 1).getDay();
+                let weekIdx = Math.floor((d + firstDayOfMonth - 1) / 7);
                 if (weekIdx > 4) weekIdx = 4;
+                
                 if (workingData[dateStr]) {
                     workingData[dateStr].forEach(ev => {
-                        // 년중 계획표의 dot 표시와 맞추기 위해 
-                        // 이미 데이터에 dot이 있으면 추가하지 않고 없으면 추가하여 표시
                         const displayText = ev.text.startsWith('•') ? ev.text : `• ${ev.text}`;
                         weeks[weekIdx] += `<div class="week-content">${displayText}</div>`;
                     });
@@ -412,6 +442,7 @@
         }
         document.getElementById('yearPlanOverlay').style.display = 'block';
     }
+    
     function closeYearPlan() { document.getElementById('yearPlanOverlay').style.display = 'none'; }
     function goToToday() { displayDate = new Date(); initData(); }
     document.addEventListener('DOMContentLoaded', initData);
