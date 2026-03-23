@@ -80,6 +80,11 @@
             background: rgba(255,255,255,0.8); z-index: 5000; display: none;
             justify-content: center; align-items: center; font-weight: bold; color: #0369a1;
         }
+
+        /* 색상 선택기 스타일 */
+        .color-picker-btn { width: 24px; height: 24px; border-radius: 50%; border: 2px solid transparent; cursor: pointer; transition: transform 0.2s; }
+        .color-picker-btn:hover { transform: scale(1.2); }
+        .color-picker-btn.active { border-color: #334155; transform: scale(1.1); box-shadow: 0 0 0 2px white, 0 0 0 4px #cbd5e1; }
     </style>
 </head>
 <body class="bg-slate-50">
@@ -195,6 +200,7 @@
     let displayDate = new Date(); 
     let workingData = {}; 
     let activeEditor = null;
+    let selectedRegColor = "black"; // 정기행사 기본 색상
     const monthNames = ["1월", "2월", "3월", "4월", "5월", "6월", "7월", "8월", "9월", "10월", "11월", "12월"];
 
     async function initData() {
@@ -278,36 +284,83 @@
         for (let i = 0; i < remainCells; i++) gridElement.innerHTML += `<div class="day-cell bg-slate-50/50"></div>`;
     }
 
-    /* 정기행사 직접 입력 로직 */
+    /* 정기행사 직접 입력 로직 (색상 선택 후 입력 시만 적용되도록 개선) */
     function editRegularEventsDirectly() {
         if (activeEditor) return;
 
         const currentYear = displayDate.getFullYear();
         const container = document.getElementById('reg-events-content');
         const displayArea = document.getElementById('reg-display-area');
-        const currentText = (workingData[`REGULAR_${currentYear}`] || [])[0]?.text || "";
+        
+        const existingData = workingData[`REGULAR_${currentYear}`]?.[0];
+        const currentText = existingData?.text || "";
+        
+        // 중요: 초기 진입 시 색상은 저장된 색상을 따름
+        selectedRegColor = existingData?.color || "black"; 
 
         displayArea.style.display = 'none';
         
+        const editorWrapper = document.createElement('div');
+        editorWrapper.className = 'flex flex-col gap-2 w-full p-2 bg-white border-2 border-sky-400 rounded-lg shadow-sm';
+        editorWrapper.onclick = e => e.stopPropagation();
+
+        const colorPicker = document.createElement('div');
+        colorPicker.className = 'flex items-center gap-3 pb-2 border-b border-slate-100';
+        colorPicker.innerHTML = `
+            <span class="text-[11px] font-bold text-slate-500">다음 입력 색상:</span>
+            <div class="flex gap-2">
+                <div class="color-picker-btn bg-black ${selectedRegColor === 'black' ? 'active' : ''}" onclick="setRegColor('black', this)"></div>
+                <div class="color-picker-btn bg-red-600 ${selectedRegColor === 'red' ? 'active' : ''}" onclick="setRegColor('red', this)"></div>
+                <div class="color-picker-btn bg-blue-600 ${selectedRegColor === 'blue' ? 'active' : ''}" onclick="setRegColor('blue', this)"></div>
+            </div>
+        `;
+
         const textarea = document.createElement('textarea');
-        textarea.className = 'w-full p-2 border-2 border-sky-400 rounded-lg text-sm focus:outline-none';
+        textarea.className = 'w-full p-2 text-sm focus:outline-none border-none';
         textarea.style.minHeight = "80px";
         textarea.value = currentText;
-        textarea.placeholder = "정기 행사를 입력하세요 (예: 매월 첫주 제직회...)";
-        textarea.onclick = e => e.stopPropagation();
         
-        container.insertBefore(textarea, displayArea);
+        // 현재 선택된 색상으로 타이핑 가능하도록 스타일 설정
+        const hexColor = selectedRegColor === 'red' ? '#dc2626' : (selectedRegColor === 'blue' ? '#2563eb' : '#000000');
+        textarea.style.color = hexColor;
+        textarea.style.caretColor = hexColor; // 커서 색상도 일치시킴
+        
+        textarea.placeholder = "정기 행사를 입력하세요 (예: 매월 첫주 제직회...)";
+        
+        editorWrapper.appendChild(colorPicker);
+        editorWrapper.appendChild(textarea);
+        container.insertBefore(editorWrapper, displayArea);
         textarea.focus();
 
         activeEditor = { 
             type: 'regular', 
             dateStr: `REGULAR_${currentYear}`, 
             textarea: textarea,
+            wrapper: editorWrapper,
             displayArea: displayArea 
         };
         
         document.getElementById('controlStatus').innerText = "정기행사 수정 중";
         document.getElementById('floatingControls').classList.add('show');
+    }
+
+    /**
+     * 색상 선택 함수: 
+     * 사용자가 버튼을 눌렀을 때만 selectedRegColor 변수를 변경하고 
+     * 입력창의 텍스트 색상을 시각적으로 변경합니다.
+     */
+    function setRegColor(color, btn) {
+        selectedRegColor = color;
+        const btns = btn.parentElement.querySelectorAll('.color-picker-btn');
+        btns.forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        
+        // 입력 중인 텍스트 영역의 색상 업데이트 (사용자에게 현재 선택 색상 알림)
+        if (activeEditor && activeEditor.textarea) {
+            const hexColor = color === 'red' ? '#dc2626' : (color === 'blue' ? '#2563eb' : '#000000');
+            activeEditor.textarea.style.color = hexColor;
+            activeEditor.textarea.style.caretColor = hexColor;
+        }
     }
 
     /* 입력 UI 범용 로직 */
@@ -345,7 +398,12 @@
         const val = activeEditor.textarea.value.trim();
         
         if (val) {
-            workingData[activeEditor.dateStr] = val.split('\n').map((line, idx) => ({ id: Date.now() + idx, text: line }));
+            if (activeEditor.type === 'regular') {
+                // 저장 시점에 선택되어 있는 최종 색상을 데이터에 반영
+                workingData[activeEditor.dateStr] = [{ id: Date.now(), text: val, color: selectedRegColor }];
+            } else {
+                workingData[activeEditor.dateStr] = val.split('\n').map((line, idx) => ({ id: Date.now() + idx, text: line }));
+            }
         } else {
             delete workingData[activeEditor.dateStr];
         }
@@ -353,7 +411,9 @@
         syncData(); 
         
         if (activeEditor.type === 'regular') {
-            document.getElementById('reg-display-area').innerText = val;
+            const displayArea = document.getElementById('reg-display-area');
+            displayArea.innerText = val;
+            displayArea.style.color = selectedRegColor === 'red' ? '#dc2626' : (selectedRegColor === 'blue' ? '#2563eb' : '#000000');
         }
         
         cancelAction();
@@ -363,7 +423,8 @@
         if (activeEditor) {
             if (activeEditor.container) activeEditor.container.style.display = 'block';
             if (activeEditor.displayArea) activeEditor.displayArea.style.display = 'block';
-            activeEditor.textarea.remove();
+            if (activeEditor.wrapper) activeEditor.wrapper.remove();
+            else activeEditor.textarea.remove();
         }
         activeEditor = null;
         document.getElementById('controlStatus').innerText = "작성 중";
@@ -398,12 +459,13 @@
             body.appendChild(tr);
         }
 
-        // 정기행사 전용 데이터 로드
         const regDisplay = document.getElementById('reg-display-area');
-        const regularText = (workingData[`REGULAR_${year}`] || []).map(ev => ev.text).join('\n');
+        const regData = workingData[`REGULAR_${year}`]?.[0];
+        const regularText = regData?.text || "";
+        const regColor = regData?.color || "black";
+        
         regDisplay.innerText = regularText || "이곳을 클릭하여 정기행사를 직접 입력하세요.";
-        if (!regularText) regDisplay.classList.add('text-slate-400');
-        else regDisplay.classList.remove('text-slate-400');
+        regDisplay.style.color = regularText ? (regColor === 'red' ? '#dc2626' : (regColor === 'blue' ? '#2563eb' : '#000000')) : '#94a3b8';
 
         document.getElementById('yearPlanOverlay').style.display = 'block';
     }
