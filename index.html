@@ -12,32 +12,49 @@
         
         .calendar-grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); width: 100%; }
         .weekday-header { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); text-align: center; font-weight: 900; background-color: #f1f5f9; border-bottom: 1px solid #e2e8f0; font-size: 0.75rem; }
-        .day-cell { min-height: 140px; border-right: 1px solid #e2e8f0; border-bottom: 1px solid #e2e8f0; position: relative; display: flex; flex-direction: column; padding-bottom: 8px; }
         
+        /* 날짜 셀 디자인: 데이터가 상단부터 보이도록 조정 */
+        .day-cell { 
+            min-height: 140px; 
+            border-right: 1px solid #e2e8f0; 
+            border-bottom: 1px solid #e2e8f0; 
+            position: relative; 
+            display: flex; 
+            flex-direction: column; 
+            padding: 4px; /* 전체 패딩 축소 */
+        }
+        
+        .date-number {
+            font-size: 0.75rem;
+            font-weight: bold;
+            margin-bottom: 2px;
+            display: flex;
+            justify-content: flex-start;
+        }
+
         .event-item { 
             font-size: 0.7rem; 
             font-weight: 600; 
-            padding: 2px 4px; 
+            padding: 0px 2px; 
             cursor: pointer; 
-            display: flex; 
-            justify-content: space-between; 
-            align-items: flex-start; 
-            margin-bottom: 4px;
+            display: block; 
             word-break: break-all; 
-            white-space: normal; 
+            white-space: pre-wrap; 
             position: relative;
+            line-height: 1.3;
+            color: #334155;
         }
-        .event-text { flex: 1; line-height: 1.3; }
+
         .today { background-color: #f0f9ff !important; }
         
         .calendar-textarea {
             width: 100%;
-            min-height: 100px; 
-            font-size: 0.75rem;
+            min-height: 120px; 
+            font-size: 0.7rem;
             line-height: 1.4;
             border: 2px solid #38bdf8;
-            border-radius: 8px;
-            padding: 8px;
+            border-radius: 4px;
+            padding: 4px;
             outline: none;
             resize: none;
             overflow: hidden; 
@@ -46,6 +63,7 @@
             z-index: 10;
         }
 
+        /* 년중 계획표 오버레이 */
         #yearPlanOverlay {
             position: fixed; top: 0; left: 0; width: 100%; height: 100%;
             background: white; z-index: 3000; display: none; overflow-y: auto;
@@ -55,7 +73,7 @@
         #yearPlanTable th, #yearPlanTable td { border: 1px solid #cbd5e1; padding: 10px; font-size: 0.85rem; vertical-align: top; }
         #yearPlanTable th { background-color: #f8fafc; font-weight: bold; text-align: center; }
         .month-col { width: 60px; text-align: center !important; vertical-align: middle !important; font-weight: 900; background-color: #f1f5f9; }
-        .week-content { font-size: 0.7rem; line-height: 1.4; color: #334155; }
+        .week-content { font-size: 0.7rem; line-height: 1.4; color: #334155; white-space: pre-wrap; margin-bottom: 4px; }
 
         @media print {
             .no-print { display: none !important; }
@@ -64,9 +82,16 @@
             #yearPlanTable th, #yearPlanTable td { border: 1px solid #000; color: black; }
         }
 
-        #floatingControls { position: fixed; bottom: -100px; left: 50%; transform: translateX(-50%); background: white; padding: 12px 20px; border-radius: 16px; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.2); display: flex; align-items: center; gap: 12px; z-index: 2000; transition: bottom 0.4s; border: 1px solid #e2e8f0; }
+        /* 하단 컨트롤 바 */
+        #floatingControls { 
+            position: fixed; bottom: -100px; left: 50%; transform: translateX(-50%); 
+            background: white; padding: 12px 20px; border-radius: 16px; 
+            box-shadow: 0 20px 25px -5px rgba(0,0,0,0.2); 
+            display: flex; align-items: center; gap: 12px; z-index: 2000; 
+            transition: bottom 0.4s; border: 1px solid #e2e8f0; 
+        }
         #floatingControls.show { bottom: 30px; }
-        .church-logo { height: 40px; }
+        .church-logo { height: 36px; }
         
         #loadingOverlay {
             position: fixed; top: 0; left: 0; width: 100%; height: 100%;
@@ -75,7 +100,6 @@
             color: #0369a1;
         }
 
-        /* 경고 메시지 스타일 */
         #urlWarning {
             display: none;
             position: fixed; top: 10px; left: 50%; transform: translateX(-50%);
@@ -83,6 +107,9 @@
             border-radius: 8px; border: 1px solid #fca5a5; z-index: 6000;
             font-size: 13px; font-weight: bold; text-align: center;
         }
+
+        /* 스크롤바 숨기기 */
+        .events-container::-webkit-scrollbar { width: 0px; background: transparent; }
     </style>
 </head>
 <body class="bg-slate-50">
@@ -98,6 +125,7 @@
     </div>
 </div>
 
+<!-- 년중 계획표 팝업 -->
 <div id="yearPlanOverlay">
     <div class="max-w-6xl mx-auto">
         <div class="flex justify-between items-center mb-6 no-print">
@@ -121,6 +149,7 @@
     </div>
 </div>
 
+<!-- 부동 컨트롤 바 -->
 <div id="floatingControls" class="no-print">
     <div class="flex flex-col"><span class="text-[10px] text-slate-500 font-bold">상태</span><span id="controlStatus" class="text-xs font-bold text-sky-700">작성 중</span></div>
     <div class="h-8 w-[1px] bg-slate-200 mx-2"></div>
@@ -128,67 +157,74 @@
     <button id="confirmBtn" onclick="confirmAction()" class="px-6 py-2 rounded-xl bg-sky-600 text-white font-bold text-sm shadow-lg">저장하기</button>
 </div>
 
+<!-- 메인 레이아웃 (사이드바 제거됨) -->
 <div class="w-full min-h-screen flex flex-col no-print">
-    <div class="px-2 md:px-4 mt-2 md:mt-4">
-        <div class="bg-sky-100 p-2.5 md:p-4 rounded-xl border border-sky-200 flex flex-col md:flex-row justify-between items-center gap-4">
-            <div class="flex-1 flex items-center gap-4 w-full">
+    <!-- 헤더 영역 -->
+    <div class="px-4 mt-4">
+        <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex flex-col md:flex-row justify-between items-center gap-4">
+            <div class="flex items-center gap-4">
                 <img src="http://www.chicagocovenant.org/files/2014/10/logo.png" alt="로고" class="church-logo" onerror="this.style.display='none';">
-                <h1 class="text-xl font-bold text-sky-900 whitespace-nowrap">시카고 언약 장로교회</h1>
+                <h1 class="text-xl font-bold text-slate-800 whitespace-nowrap">시카고 언약 장로교회</h1>
             </div>
             
-            <div class="flex-1 flex justify-center items-center gap-4">
-                <button onclick="changeYear(-1)" class="w-10 h-10 rounded-full bg-white border border-sky-300 text-sky-700 flex items-center justify-center shadow-sm"><i class="fas fa-angles-left"></i></button>
-                <div class="bg-white px-8 py-2 rounded-full font-black text-xl border border-sky-300 text-sky-800 shadow-sm"><span id="headerYearDisplay"></span>년 일정표</div>
-                <button onclick="changeYear(1)" class="w-10 h-10 rounded-full bg-white border border-sky-300 text-sky-700 flex items-center justify-center shadow-sm"><i class="fas fa-angles-right"></i></button>
+            <div class="flex items-center gap-4">
+                <button onclick="changeYear(-1)" class="w-9 h-9 rounded-full bg-slate-50 border border-slate-200 text-slate-600 flex items-center justify-center hover:bg-slate-100"><i class="fas fa-angles-left"></i></button>
+                <div class="font-black text-xl text-slate-800"><span id="headerYearDisplay"></span>년</div>
+                <button onclick="changeYear(1)" class="w-9 h-9 rounded-full bg-slate-50 border border-slate-200 text-slate-600 flex items-center justify-center hover:bg-slate-100"><i class="fas fa-angles-right"></i></button>
             </div>
 
-            <div class="flex-1 flex justify-end items-center gap-3">
-                <button onclick="showYearPlan()" class="bg-emerald-600 text-white px-5 py-2.5 rounded-xl font-bold text-sm shadow-md flex items-center gap-2"><i class="fas fa-eye"></i> <span>년중 계획표</span></button>
-                <div class="flex items-center bg-white border border-sky-200 rounded-xl shadow-sm overflow-hidden">
-                    <button onclick="changeMonth(-1)" class="px-3 py-2 hover:bg-sky-50 border-r border-sky-100"><i class="fas fa-chevron-left"></i></button>
-                    <button onclick="goToToday()" class="px-4 py-2 text-xs font-bold text-sky-700 hover:bg-sky-50 min-w-[80px]"><span id="currentMonthLabel">오늘</span></button>
-                    <button onclick="changeMonth(1)" class="px-3 py-2 hover:bg-sky-50 border-l border-sky-100"><i class="fas fa-chevron-right"></i></button>
+            <div class="flex items-center gap-3">
+                <button onclick="showYearPlan()" class="bg-emerald-600 text-white px-5 py-2 rounded-xl font-bold text-sm shadow-sm hover:bg-emerald-700 transition-colors flex items-center gap-2">
+                    <i class="fas fa-calendar-check"></i> <span>년중 계획표</span>
+                </button>
+                <div class="flex items-center bg-slate-50 border border-slate-200 rounded-xl overflow-hidden">
+                    <button onclick="changeMonth(-1)" class="px-3 py-2 hover:bg-slate-200 border-r border-slate-200"><i class="fas fa-chevron-left"></i></button>
+                    <button onclick="goToToday()" class="px-4 py-2 text-xs font-bold text-slate-700 hover:bg-slate-200 min-w-[70px] text-center">
+                        <span id="currentMonthLabel">오늘</span>
+                    </button>
+                    <button onclick="changeMonth(1)" class="px-3 py-2 hover:bg-slate-200 border-l border-slate-200"><i class="fas fa-chevron-right"></i></button>
                 </div>
             </div>
         </div>
     </div>
 
-    <div class="p-2 md:p-4 w-full flex-grow">
+    <!-- 캘린더 메인 영역 -->
+    <div class="p-4 w-full flex-grow">
         <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <div class="calendar-container bg-white rounded-xl border shadow-sm overflow-hidden">
-                <div class="p-5 text-center font-black text-lg bg-slate-50 border-b" id="monthTitle1"></div>
+            <!-- 첫 번째 달 -->
+            <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden flex flex-col">
+                <div class="p-4 text-center font-black text-lg bg-slate-50 border-b border-slate-200" id="monthTitle1"></div>
                 <div class="weekday-header">
-                    <div class="text-red-600 p-2">일요일</div>
-                    <div class="p-2">월요일</div>
-                    <div class="p-2">화요일</div>
-                    <div class="p-2">수요일</div>
-                    <div class="p-2">목요일</div>
-                    <div class="p-2">금요일</div>
-                    <div class="text-sky-600 p-2">토요일</div>
+                    <div class="text-red-500 p-2">일</div>
+                    <div class="p-2">월</div>
+                    <div class="p-2">화</div>
+                    <div class="p-2">수</div>
+                    <div class="p-2">목</div>
+                    <div class="p-2">금</div>
+                    <div class="text-sky-500 p-2">토</div>
                 </div>
-                <div id="calendarDays1" class="calendar-grid"></div>
+                <div id="calendarDays1" class="calendar-grid flex-grow"></div>
             </div>
-            <div class="calendar-container bg-white rounded-xl border shadow-sm overflow-hidden">
-                <div class="p-5 text-center font-black text-lg bg-slate-50 border-b" id="monthTitle2"></div>
+            
+            <!-- 두 번째 달 -->
+            <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden flex flex-col">
+                <div class="p-4 text-center font-black text-lg bg-slate-50 border-b border-slate-200" id="monthTitle2"></div>
                 <div class="weekday-header">
-                    <div class="text-red-600 p-2">일요일</div>
-                    <div class="p-2">월요일</div>
-                    <div class="p-2">화요일</div>
-                    <div class="p-2">수요일</div>
-                    <div class="p-2">목요일</div>
-                    <div class="p-2">금요일</div>
-                    <div class="text-sky-600 p-2">토요일</div>
+                    <div class="text-red-500 p-2">일</div>
+                    <div class="p-2">월</div>
+                    <div class="p-2">화</div>
+                    <div class="p-2">수</div>
+                    <div class="p-2">목</div>
+                    <div class="p-2">금</div>
+                    <div class="text-sky-500 p-2">토</div>
                 </div>
-                <div id="calendarDays2" class="calendar-grid"></div>
+                <div id="calendarDays2" class="calendar-grid flex-grow"></div>
             </div>
         </div>
     </div>
 </div>
 
 <script>
-    /**
-     * [중요] 구글 앱스크립트 배포 후 생성된 '웹 앱 URL'을 아래 큰따옴표 안에 입력해야 합니다.
-     */
     const WEB_APP_URL = "https://script.google.com/macros/s/AKfycbxHTlhuGvX0u2oMkOx2cciTtF14FRl-Lb2yUb-yMAajJcnonq3S1m69BRWRmAGFs9vV/exec"; 
     
     let displayDate = new Date(); 
@@ -202,7 +238,6 @@
         document.getElementById('currentMonthLabel').innerText = monthNames[displayDate.getMonth()];
         
         if (!WEB_APP_URL || !WEB_APP_URL.startsWith('http')) {
-            console.error("WEB_APP_URL이 올바르지 않습니다.");
             document.getElementById('urlWarning').style.display = 'block';
             document.getElementById('loadingOverlay').style.display = 'none';
             const local = localStorage.getItem(`church_events_${currentYear}`);
@@ -217,7 +252,6 @@
         try {
             const fetchUrl = `${WEB_APP_URL}?action=getEvents&t=${Date.now()}`;
             const response = await fetch(fetchUrl, { method: 'GET', redirect: 'follow' });
-            if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
             const result = await response.json();
             if (result.status === 'success') {
                 workingData = result.data || {};
@@ -225,7 +259,6 @@
             }
             renderCalendars();
         } catch (e) {
-            console.error("데이터 로드 실패:", e);
             const local = localStorage.getItem(`church_events_${currentYear}`);
             workingData = local ? JSON.parse(local) : {};
             renderCalendars();
@@ -259,7 +292,6 @@
     function renderCalendars() {
         const firstMonth = new Date(displayDate.getFullYear(), displayDate.getMonth(), 1);
         renderSingleCalendar(firstMonth, "monthTitle1", "calendarDays1");
-        
         const secondMonth = new Date(displayDate.getFullYear(), displayDate.getMonth() + 1, 1);
         renderSingleCalendar(secondMonth, "monthTitle2", "calendarDays2");
     }
@@ -275,8 +307,9 @@
         const gridElement = document.getElementById(gridId);
         gridElement.innerHTML = '';
 
+        // 이전 달 빈 칸
         for (let i = 0; i < firstDay; i++) {
-            gridElement.innerHTML += `<div class="day-cell bg-slate-50/50 border-r border-b border-slate-200"></div>`;
+            gridElement.innerHTML += `<div class="day-cell bg-slate-50/50"></div>`;
         }
 
         for (let i = 1; i <= lastDate; i++) {
@@ -284,21 +317,22 @@
             const isToday = today.getFullYear() === year && today.getMonth() === month && today.getDate() === i;
             
             const currentDayOfWeek = new Date(year, month, i).getDay();
-            let dayColorClass = "text-slate-500";
-            if (currentDayOfWeek === 0) dayColorClass = "text-red-600";
-            if (currentDayOfWeek === 6) dayColorClass = "text-sky-600";
+            let dayColorClass = "text-slate-400";
+            if (currentDayOfWeek === 0) dayColorClass = "text-red-500";
+            if (currentDayOfWeek === 6) dayColorClass = "text-sky-500";
 
-            let eventsHtml = (workingData[dateStr] || []).map(event => `
-                <div class="event-item group text-slate-700" onclick="editEvent(event, '${dateStr}', ${event.id})">
-                    <span class="event-text">${event.text}</span>
-                </div>
-            `).join('');
+            let combinedText = (workingData[dateStr] || []).map(ev => ev.text).join('\n');
+            let eventsHtml = combinedText ? `
+                <div class="event-item" onclick="editEvent(event, '${dateStr}')">${combinedText}</div>
+            ` : '';
 
             gridElement.innerHTML += `
-                <div class="day-cell group bg-white p-2 hover:bg-slate-50 cursor-pointer ${isToday ? 'today' : ''}" onclick="showInput('${dateStr}', this)">
-                    <div class="text-xs font-bold mb-1"><span class="${isToday ? 'bg-sky-600 text-white px-1.5 py-0.5 rounded-full' : dayColorClass}">${i}</span></div>
+                <div class="day-cell bg-white group hover:bg-slate-50 cursor-pointer ${isToday ? 'today' : ''}" onclick="showInput('${dateStr}', this)">
+                    <div class="date-number">
+                        <span class="${isToday ? 'bg-sky-600 text-white w-5 h-5 flex items-center justify-center rounded-full text-[10px]' : dayColorClass}">${i}</span>
+                    </div>
                     <div class="input-area"></div>
-                    <div class="events-container overflow-y-auto max-h-[120px]">${eventsHtml}</div>
+                    <div class="events-container flex-grow overflow-hidden">${eventsHtml}</div>
                 </div>
             `;
         }
@@ -306,7 +340,7 @@
         const totalCells = firstDay + lastDate;
         const remainCells = (7 - (totalCells % 7)) % 7;
         for (let i = 0; i < remainCells; i++) {
-            gridElement.innerHTML += `<div class="day-cell bg-slate-50/50 border-r border-b border-slate-200"></div>`;
+            gridElement.innerHTML += `<div class="day-cell bg-slate-50/50"></div>`;
         }
     }
 
@@ -314,7 +348,7 @@
         if (activeEditor) return;
         const textarea = document.createElement('textarea');
         textarea.className = 'calendar-textarea';
-        textarea.placeholder = '일정을 입력하세요...';
+        textarea.placeholder = '일정 입력...';
         textarea.onclick = e => e.stopPropagation();
         
         textarea.oninput = function() {
@@ -328,12 +362,11 @@
         document.getElementById('floatingControls').classList.add('show');
     }
 
-    function editEvent(e, dateStr, eventId) {
+    function editEvent(e, dateStr) {
         e.stopPropagation();
         if (activeEditor) return;
         
-        // 기존 텍스트 조합 (점 포함)
-        const allText = workingData[dateStr].map(ev => ev.text).join('\n');
+        const allText = (workingData[dateStr] || []).map(ev => ev.text).join('\n');
         const cell = e.currentTarget.closest('.day-cell');
         const container = cell.querySelector('.events-container');
         container.style.display = 'none';
@@ -350,8 +383,6 @@
 
         cell.querySelector('.input-area').appendChild(textarea);
         textarea.focus();
-        
-        textarea.style.height = 'auto';
         textarea.style.height = (textarea.scrollHeight) + 'px';
 
         activeEditor = { type: 'edit_all', dateStr, textarea, container };
@@ -361,26 +392,14 @@
 
     function confirmAction() {
         if (!activeEditor) return;
-        const val = activeEditor.textarea.value.trim();
+        const val = activeEditor.textarea.value;
         
-        if (val) {
-            const lines = val.split('\n').filter(l => l.trim() !== "");
+        if (val.trim()) {
+            const lines = val.split('\n');
             workingData[activeEditor.dateStr] = lines.map((line, idx) => {
-                let text = line.trim();
-                // 불렛 포인트 자동 완성 로직
-                if (!text.startsWith('•')) {
-                    text = '• ' + text;
-                } else if (text.startsWith('•') && !text.startsWith('• ')) {
-                    text = '• ' + text.substring(1).trim();
-                }
-                
-                return {
-                    id: Date.now() + idx,
-                    text: text
-                };
+                return { id: Date.now() + idx, text: line };
             });
         } else {
-            // 내용이 비어있으면 해당 날짜 데이터 삭제
             delete workingData[activeEditor.dateStr];
         }
         
@@ -419,10 +438,8 @@
                 if (weekIdx > 4) weekIdx = 4;
                 
                 if (workingData[dateStr]) {
-                    workingData[dateStr].forEach(ev => {
-                        const displayText = ev.text.startsWith('•') ? ev.text : `• ${ev.text}`;
-                        weeks[weekIdx] += `<div class="week-content">${displayText}</div>`;
-                    });
+                    const combined = workingData[dateStr].map(ev => ev.text).join('\n');
+                    weeks[weekIdx] += `<div class="week-content">${combined}</div>`;
                 }
             }
             weeks.forEach(w => { tr.innerHTML += `<td>${w}</td>`; });
