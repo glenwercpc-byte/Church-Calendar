@@ -30,28 +30,6 @@
         .event-text { flex: 1; line-height: 1.3; }
         .today { background-color: #f0f9ff !important; }
         
-        /* 삭제 확인 팝업 스타일 수정: 아이콘 상단에 배치 */
-        .delete-confirm-pop {
-            position: absolute;
-            right: 0;
-            bottom: 100%; /* 부모(버튼 컨테이너)의 위쪽으로 배치 */
-            margin-bottom: 5px; /* 약간의 간격 */
-            background: white;
-            border: 1px solid #fca5a5;
-            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
-            border-radius: 6px;
-            display: flex;
-            align-items: center;
-            gap: 4px;
-            padding: 2px 6px;
-            z-index: 50;
-            animation: fadeIn 0.2s ease-out;
-        }
-        @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(5px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
-
         .calendar-textarea {
             width: 100%;
             min-height: 100px; 
@@ -107,7 +85,7 @@
         }
     </style>
 </head>
-<body class="bg-slate-50" onclick="closeAllDeletePopups()">
+<body class="bg-slate-50">
 
 <div id="urlWarning">
     <i class="fas fa-exclamation-triangle mr-1"></i> WEB_APP_URL이 설정되지 않았습니다. 코드를 확인해 주세요.
@@ -313,11 +291,6 @@
             let eventsHtml = (workingData[dateStr] || []).map(event => `
                 <div class="event-item group text-slate-700" onclick="editEvent(event, '${dateStr}', ${event.id})">
                     <span class="event-text">${event.text}</span>
-                    <div class="relative delete-container">
-                        <button class="ml-1 text-[10px] text-red-400 opacity-0 group-hover:opacity-100 p-1" onclick="askDelete(event, '${dateStr}', ${event.id})">
-                            <i class="fas fa-times"></i>
-                        </button>
-                    </div>
                 </div>
             `).join('');
 
@@ -337,41 +310,8 @@
         }
     }
 
-    // 삭제 확인 팝업 표시 (위치: 아이콘 상단)
-    function askDelete(e, dateStr, eventId) {
-        e.stopPropagation();
-        closeAllDeletePopups(); 
-        
-        const container = e.currentTarget.parentElement;
-        const pop = document.createElement('div');
-        pop.className = 'delete-confirm-pop';
-        pop.onclick = (ev) => ev.stopPropagation(); 
-        
-        pop.innerHTML = `
-            <span class="text-[9px] font-bold text-red-600 whitespace-nowrap">삭제?</span>
-            <button class="bg-red-500 text-white px-1.5 py-0.5 rounded text-[9px] font-bold" onclick="executeDelete(event, '${dateStr}', ${eventId})">확인</button>
-            <button class="bg-slate-200 text-slate-600 px-1.5 py-0.5 rounded text-[9px] font-bold" onclick="closeAllDeletePopups()">X</button>
-        `;
-        
-        container.appendChild(pop);
-    }
-
-    function closeAllDeletePopups() {
-        const pops = document.querySelectorAll('.delete-confirm-pop');
-        pops.forEach(p => p.remove());
-    }
-
-    function executeDelete(e, dateStr, eventId) {
-        e.stopPropagation();
-        workingData[dateStr] = workingData[dateStr].filter(ev => ev.id !== eventId);
-        if (workingData[dateStr].length === 0) delete workingData[dateStr];
-        syncData(); 
-        renderCalendars();
-    }
-
     function showInput(dateStr, cell) {
         if (activeEditor) return;
-        closeAllDeletePopups();
         const textarea = document.createElement('textarea');
         textarea.className = 'calendar-textarea';
         textarea.placeholder = '일정을 입력하세요...';
@@ -391,8 +331,8 @@
     function editEvent(e, dateStr, eventId) {
         e.stopPropagation();
         if (activeEditor) return;
-        closeAllDeletePopups();
         
+        // 기존 텍스트 조합 (점 포함)
         const allText = workingData[dateStr].map(ev => ev.text).join('\n');
         const cell = e.currentTarget.closest('.day-cell');
         const container = cell.querySelector('.events-container');
@@ -427,6 +367,7 @@
             const lines = val.split('\n').filter(l => l.trim() !== "");
             workingData[activeEditor.dateStr] = lines.map((line, idx) => {
                 let text = line.trim();
+                // 불렛 포인트 자동 완성 로직
                 if (!text.startsWith('•')) {
                     text = '• ' + text;
                 } else if (text.startsWith('•') && !text.startsWith('• ')) {
@@ -439,6 +380,7 @@
                 };
             });
         } else {
+            // 내용이 비어있으면 해당 날짜 데이터 삭제
             delete workingData[activeEditor.dateStr];
         }
         
