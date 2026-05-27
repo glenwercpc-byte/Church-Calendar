@@ -465,21 +465,37 @@
         body.innerHTML = '';
         const year = displayDate.getFullYear();
         document.getElementById('overlayTitle').innerText = `${year}년 년중 계획표`;
+
+        // 연속 중복 체크: 텍스트별로 마지막 출력된 날짜를 기억
+        const lastSeenDate = {};
+
         for (let m = 0; m < 12; m++) {
             const tr = document.createElement('tr');
             tr.innerHTML = `<td class="month-col">${m + 1}월</td>`;
             const weeks = ["", "", "", "", ""];
             const lastDay = new Date(year, m + 1, 0).getDate();
+
             for (let d = 1; d <= lastDay; d++) {
                 const dateStr = `${year}-${String(m + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
                 const firstDayOfMonth = new Date(year, m, 1).getDay();
                 let weekIdx = Math.floor((d + firstDayOfMonth - 1) / 7);
                 if (weekIdx > 4) weekIdx = 4;
-                
+
                 if (workingData[dateStr]) {
                     workingData[dateStr].forEach(ev => {
-                        const displayText = ev.text.startsWith('•') ? ev.text : `• ${ev.text}`;
-                        weeks[weekIdx] += `<div class="week-content">${displayText}</div>`;
+                        const text = ev.text.startsWith('•') ? ev.text : `• ${ev.text}`;
+
+                        // 바로 전날에 동일 텍스트가 출력됐으면 스킵 (연속 중복)
+                        const mm = String(m + 1).padStart(2, '0');
+                        const prevDateStr = d > 1
+                            ? `${year}-${mm}-${String(d - 1).padStart(2, '0')}`
+                            : null;
+
+                        const isDuplicate = prevDateStr !== null && lastSeenDate[text] === prevDateStr;
+                        if (!isDuplicate) {
+                            weeks[weekIdx] += `<div class="week-content">${text}</div>`;
+                        }
+                        lastSeenDate[text] = dateStr;
                     });
                 }
             }
