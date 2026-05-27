@@ -213,7 +213,7 @@
     /**
      * [중요] 구글 앱스크립트 배포 후 생성된 '웹 앱 URL'을 아래 큰따옴표 안에 입력해야 합니다.
      */
-    const WEB_APP_URL = "https://script.google.com/macros/s/AKfycby-h62cYfsU1ah7fBYF6t1Nmn96TaifKRKMgaQSOFR9IKdud5pidEeyt1C61miCeg_7/exec"; 
+    const WEB_APP_URL = "https://script.google.com/macros/s/AKfycbwVjLMLQzfbtDPtq1PeTc1UHWFdSVz7fGz4Xyrso2b1uXA0F2YncGtV9qBi41UJtfbJ/exec"; 
     
     let displayDate = new Date(); 
     let workingData = {}; 
@@ -504,6 +504,33 @@
             weeks.forEach(w => { tr.innerHTML += `<td>${w}</td>`; });
             body.appendChild(tr);
         }
+        // 추가사항 행
+        const extraTr = document.createElement('tr');
+        extraTr.innerHTML = `
+            <td class="month-col" style="font-weight:900; background:#f1f5f9;">추가사항</td>
+            <td></td>
+            <td></td>
+            <td class="week-content" style="vertical-align:top; padding:6px; font-size:0.75rem; line-height:1.6;">
+                <div>* 샘터모임 1,2째주 모임 권고</div>
+                <div>* 제직부서장회의 - 격월 짝수달 3째주 금요일 실시</div>
+            </td>
+            <td class="week-content" style="vertical-align:top; padding:6px; font-size:0.75rem; line-height:1.6;">
+                <div>* 청지기 교육 - 매월 4째주일</div>
+                <div>* 팀장회의 - 매월 첫째 금요일</div>
+                <div>* 정기 당회 - 매월 둘째주 토요일</div>
+            </td>
+            <td class="week-content" style="vertical-align:top; padding:6px; font-size:0.75rem; line-height:1.6;">
+                <div>* 새벽예배 없는 날</div>
+                <div style="padding-left:8px;">1) 매주 월요일과 주일</div>
+                <div style="padding-left:8px;">2) Thanksgiving Day</div>
+                <div style="padding-left:8px;">3) Christmas Day</div>
+                <div style="margin-top:6px;">* 금요 기도회 없는 날</div>
+                <div style="padding-left:8px;">1) Thanksgiving Friday</div>
+                <div style="padding-left:8px;">2) Christmas Day</div>
+            </td>
+        `;
+        body.appendChild(extraTr);
+
         document.getElementById('yearPlanOverlay').style.display = 'block';
     }
     
@@ -516,15 +543,39 @@
         btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> 생성 중...';
 
         try {
-            const url = `${WEB_APP_URL}?action=createYearPlanSheet&year=${year}&t=${Date.now()}`;
-            const response = await fetch(url, { method: 'GET', redirect: 'follow' });
-            const result = await response.json();
+            // Apps Script 웹앱은 리다이렉트를 거치므로 직접 URL을 만들어 호출
+            // no-cors 대신 jsonp 방식으로 처리 (콜백 함수 활용)
+            const sheetUrl = await new Promise((resolve, reject) => {
+                const callbackName = '_gsCallback_' + Date.now();
+                const script = document.createElement('script');
+                const timeout = setTimeout(() => {
+                    delete window[callbackName];
+                    script.remove();
+                    reject(new Error('요청 시간 초과'));
+                }, 30000);
 
-            if (result.status === 'success') {
-                window.open(result.url, '_blank');
-            } else {
-                alert('구글 시트 생성 실패: ' + result.message);
-            }
+                window[callbackName] = (result) => {
+                    clearTimeout(timeout);
+                    delete window[callbackName];
+                    script.remove();
+                    if (result.status === 'success') {
+                        resolve(result.url);
+                    } else {
+                        reject(new Error(result.message || '생성 실패'));
+                    }
+                };
+
+                script.src = `${WEB_APP_URL}?action=createYearPlanSheet&year=${year}&callback=${callbackName}&t=${Date.now()}`;
+                script.onerror = () => {
+                    clearTimeout(timeout);
+                    delete window[callbackName];
+                    reject(new Error('스크립트 로드 실패'));
+                };
+                document.head.appendChild(script);
+            });
+
+            window.open(sheetUrl, '_blank');
+
         } catch (e) {
             alert('오류가 발생했습니다: ' + e.message);
         } finally {
