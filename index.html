@@ -128,8 +128,8 @@
                 <button onclick="window.print()" class="bg-emerald-600 text-white px-6 py-2 rounded-xl font-bold shadow-md hover:bg-emerald-700 transition-colors">
                     <i class="fas fa-print mr-2"></i>인쇄하기
                 </button>
-                <button onclick="window.print()" class="bg-blue-500 text-white px-6 py-2 rounded-xl font-bold shadow-md hover:bg-blue-600 transition-colors">
-                    <i class="fab fa-google-drive mr-2"></i>구글 독스 출력
+                <button onclick="exportToGoogleSheet()" id="exportSheetBtn" class="bg-blue-500 text-white px-6 py-2 rounded-xl font-bold shadow-md hover:bg-blue-600 transition-colors flex items-center gap-2">
+                    <i class="fab fa-google-drive"></i>구글 시트로 내보내기
                 </button>
                 <button onclick="closeYearPlan()" class="bg-slate-200 text-slate-700 px-6 py-2 rounded-xl font-bold hover:bg-slate-300 transition-colors">닫기</button>
             </div>
@@ -213,7 +213,7 @@
     /**
      * [중요] 구글 앱스크립트 배포 후 생성된 '웹 앱 URL'을 아래 큰따옴표 안에 입력해야 합니다.
      */
-    const WEB_APP_URL = "https://script.google.com/macros/s/AKfycbyrsnwBudGM24gjFa-f2F3hid7dO3MYqLLIzkttFCUWD2Rjbm6wR_S-1RVYLCI7BWfZ/exec"; 
+    const WEB_APP_URL = "https://script.google.com/macros/s/AKfycbwxffSfTULRqnlzCg0APN75ojI74GcmGaHCmJbrRXASXBL8yGGkMU17fbqwDzdr547s/exec"; 
     
     let displayDate = new Date(); 
     let workingData = {}; 
@@ -507,6 +507,31 @@
         document.getElementById('yearPlanOverlay').style.display = 'block';
     }
     
+
+    async function exportToGoogleSheet() {
+        const btn = document.getElementById('exportSheetBtn');
+        const year = displayDate.getFullYear();
+
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> 생성 중...';
+
+        try {
+            const url = `${WEB_APP_URL}?action=createYearPlanSheet&year=${year}&t=${Date.now()}`;
+            const response = await fetch(url, { method: 'GET', redirect: 'follow' });
+            const result = await response.json();
+
+            if (result.status === 'success') {
+                window.open(result.url, '_blank');
+            } else {
+                alert('구글 시트 생성 실패: ' + result.message);
+            }
+        } catch (e) {
+            alert('오류가 발생했습니다: ' + e.message);
+        } finally {
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fab fa-google-drive"></i> 구글 시트로 내보내기';
+        }
+    }
     function closeYearPlan() { document.getElementById('yearPlanOverlay').style.display = 'none'; }
     function goToToday() { displayDate = new Date(); initData(); }
 
