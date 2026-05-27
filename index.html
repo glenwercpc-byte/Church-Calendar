@@ -504,6 +504,33 @@
             weeks.forEach(w => { tr.innerHTML += `<td>${w}</td>`; });
             body.appendChild(tr);
         }
+        // 추가사항 행
+        const extraTr = document.createElement('tr');
+        extraTr.innerHTML = `
+            <td class="month-col" style="font-weight:900; background:#f1f5f9;">추가사항</td>
+            <td></td>
+            <td></td>
+            <td class="week-content" style="vertical-align:top; padding:6px; font-size:0.75rem; line-height:1.6;">
+                <div>* 샘터모임 1,2째주 모임 권고</div>
+                <div>* 제직부서장회의 - 격월 짝수달 3째주 금요일 실시</div>
+            </td>
+            <td class="week-content" style="vertical-align:top; padding:6px; font-size:0.75rem; line-height:1.6;">
+                <div>* 청지기 교육 - 매월 4째주일</div>
+                <div>* 팀장회의 - 매월 첫째 금요일</div>
+                <div>* 정기 당회 - 매월 둘째주 토요일</div>
+            </td>
+            <td class="week-content" style="vertical-align:top; padding:6px; font-size:0.75rem; line-height:1.6;">
+                <div>* 새벽예배 없는 날</div>
+                <div style="padding-left:8px;">1) 매주 월요일과 주일</div>
+                <div style="padding-left:8px;">2) Thanksgiving Day</div>
+                <div style="padding-left:8px;">3) Christmas Day</div>
+                <div style="margin-top:6px;">* 금요 기도회 없는 날</div>
+                <div style="padding-left:8px;">1) Thanksgiving Friday</div>
+                <div style="padding-left:8px;">2) Christmas Day</div>
+            </td>
+        `;
+        body.appendChild(extraTr);
+
         document.getElementById('yearPlanOverlay').style.display = 'block';
     }
     
