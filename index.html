@@ -68,59 +68,42 @@
             z-index: 10;
         }
 
-        /* 줄 단위 에디터 */
-        .line-editor-wrap {
-            border: 2px solid #38bdf8;
-            border-radius: 8px;
-            background: #fff;
-            box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1);
-            padding: 4px;
-            z-index: 10;
-        }
-        .line-editor-row {
-            display: flex;
+        /* 줄별 색상 팝업 */
+        #colorPopup {
+            display: none;
+            position: absolute;
+            z-index: 3000;
+            background: white;
+            border: 1px solid #e2e8f0;
+            border-radius: 12px;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.15);
+            padding: 6px 10px;
             align-items: center;
-            gap: 3px;
-            padding: 2px 2px;
-            border-bottom: 1px dashed #e2e8f0;
+            gap: 6px;
+            white-space: nowrap;
         }
-        .line-editor-row:last-child { border-bottom: none; }
-        .line-input {
-            flex: 1;
-            font-size: 0.75rem;
-            line-height: 1.4;
-            border: none;
-            outline: none;
-            padding: 3px 4px;
-            background: transparent;
-            font-family: inherit;
-            min-width: 0;
+        #colorPopup.visible { display: flex; }
+        #colorPopup span {
+            font-size: 0.65rem;
+            font-weight: 700;
+            color: #64748b;
+            margin-right: 2px;
         }
-        .line-color-btn {
-            width: 13px; height: 13px;
+        .cp-btn {
+            width: 20px; height: 20px;
             border-radius: 50%;
-            border: 1.5px solid #cbd5e1;
+            border: 2px solid transparent;
             cursor: pointer;
+            transition: transform 0.12s, border-color 0.12s;
             flex-shrink: 0;
-            transition: transform 0.1s;
         }
-        .line-color-btn.active { border-color: #0284c7 !important; transform: scale(1.3); }
-        .line-color-btn.c-black { background: #1e293b; }
-        .line-color-btn.c-red   { background: #dc2626; }
-        .line-color-btn.c-blue  { background: #2563eb; }
-        .line-del-btn {
-            font-size: 9px; color: #fca5a5; cursor: pointer;
-            background: none; border: none; padding: 2px; flex-shrink: 0;
-            opacity: 0; transition: opacity 0.15s;
-        }
-        .line-editor-row:hover .line-del-btn { opacity: 1; }
-        .line-add-btn {
-            width: 100%; margin-top: 3px; padding: 3px;
-            font-size: 0.7rem; color: #94a3b8; background: none;
-            border: 1px dashed #cbd5e1; border-radius: 6px; cursor: pointer;
-            transition: all 0.15s;
-        }
-        .line-add-btn:hover { color: #0284c7; border-color: #7dd3fc; background: #f0f9ff; }
+        .cp-btn:hover { transform: scale(1.15); }
+        .cp-btn.selected { border-color: #0284c7; transform: scale(1.2); }
+        .cp-black { background: #1e293b; }
+        .cp-red   { background: #dc2626; }
+        .cp-blue  { background: #2563eb; }
+        /* 현재 편집 줄 하이라이트 */
+        .line-highlight { background: #f0f9ff !important; }
 
         #yearPlanOverlay {
             position: fixed; top: 0; left: 0; width: 100%; height: 100%;
@@ -162,6 +145,14 @@
     </style>
 </head>
 <body class="bg-slate-50" onclick="closeAllDeletePopups()">
+
+<!-- 줄별 색상 선택 팝업 -->
+<div id="colorPopup">
+    <span>색상</span>
+    <button class="cp-btn cp-black selected" data-color="black" title="검정" onclick="selectLineColor('black', event)"></button>
+    <button class="cp-btn cp-red"   data-color="red"   title="빨강" onclick="selectLineColor('red', event)"></button>
+    <button class="cp-btn cp-blue"  data-color="blue"  title="파랑" onclick="selectLineColor('blue', event)"></button>
+</div>
 
 <div id="urlWarning">
     <i class="fas fa-exclamation-triangle mr-1"></i> WEB_APP_URL이 설정되지 않았습니다. 코드를 확인해 주세요.
@@ -445,13 +436,25 @@
     function showInput(dateStr, cell) {
         if (activeEditor) return;
         closeAllDeletePopups();
-        const wrap = buildLineEditor([], dateStr);
-        wrap.onclick = e => e.stopPropagation();
-        cell.querySelector('.input-area').appendChild(wrap);
-        // 첫 번째 줄 input에 포커스
-        const firstInput = wrap.querySelector('.line-input');
-        if (firstInput) firstInput.focus();
-        activeEditor = { type: 'new', dateStr, wrap };
+
+        const textarea = document.createElement('textarea');
+        textarea.className = 'calendar-textarea';
+        textarea.placeholder = '일정을 입력하세요...';
+        textarea.onclick = e => e.stopPropagation();
+        textarea.oninput = function() {
+            this.style.height = 'auto';
+            this.style.height = this.scrollHeight + 'px';
+            syncLineColors(this);
+        };
+        textarea.addEventListener('keydown', onTextareaKeydown);
+        textarea.addEventListener('click',   onTextareaFocus);
+        textarea.addEventListener('focus',   onTextareaFocus);
+        textarea.addEventListener('keyup',   onTextareaFocus);
+
+        cell.querySelector('.input-area').appendChild(textarea);
+        textarea.focus();
+        activeEditor = { type: 'new', dateStr, textarea, lineColors: ['black'] };
+        showColorPopup(textarea, 0);
         document.getElementById('floatingControls').classList.add('show');
     }
 
@@ -461,38 +464,52 @@
         closeAllDeletePopups();
 
         const existingEvents = workingData[dateStr] || [];
+        const allText = existingEvents.map(ev => ev.text.replace(/^•\s?/, '')).join('\n');
+        const lineColors = existingEvents.map(ev => ev.color || 'black');
+
         const cell = e.currentTarget.closest('.day-cell');
         const container = cell.querySelector('.events-container');
         container.style.display = 'none';
 
-        const wrap = buildLineEditor(existingEvents, dateStr);
-        wrap.onclick = e => e.stopPropagation();
-        cell.querySelector('.input-area').appendChild(wrap);
-        const firstInput = wrap.querySelector('.line-input');
-        if (firstInput) firstInput.focus();
+        const textarea = document.createElement('textarea');
+        textarea.className = 'calendar-textarea';
+        textarea.value = allText;
+        textarea.onclick = e => e.stopPropagation();
+        textarea.oninput = function() {
+            this.style.height = 'auto';
+            this.style.height = this.scrollHeight + 'px';
+            syncLineColors(this);
+        };
+        textarea.addEventListener('keydown', onTextareaKeydown);
+        textarea.addEventListener('click',   onTextareaFocus);
+        textarea.addEventListener('focus',   onTextareaFocus);
+        textarea.addEventListener('keyup',   onTextareaFocus);
 
-        activeEditor = { type: 'edit_all', dateStr, wrap, container };
+        cell.querySelector('.input-area').appendChild(textarea);
+        textarea.style.height = 'auto';
+        textarea.style.height = textarea.scrollHeight + 'px';
+        textarea.focus();
+
+        activeEditor = { type: 'edit_all', dateStr, textarea, container, lineColors };
+        showColorPopup(textarea, 0);
         document.getElementById('controlStatus').innerText = "수정 중";
         document.getElementById('floatingControls').classList.add('show');
     }
 
     function confirmAction() {
         if (!activeEditor) return;
-        const rows = activeEditor.wrap.querySelectorAll('.line-editor-row');
-        const events = [];
-        rows.forEach((row, idx) => {
-            const input = row.querySelector('.line-input');
-            const activeColorBtn = row.querySelector('.line-color-btn.active');
-            let text = input ? input.value.trim() : '';
-            if (!text) return;
-            if (!text.startsWith('•')) text = '• ' + text;
-            else if (!text.startsWith('• ')) text = '• ' + text.substring(1).trim();
-            const color = activeColorBtn ? activeColorBtn.dataset.color : 'black';
-            events.push({ id: Date.now() + idx, text, color });
-        });
+        const val = activeEditor.textarea.value.trim();
+        hideColorPopup();
 
-        if (events.length > 0) {
-            workingData[activeEditor.dateStr] = events;
+        if (val) {
+            const lines = val.split('\n').filter(l => l.trim() !== '');
+            const colors = activeEditor.lineColors || [];
+            workingData[activeEditor.dateStr] = lines.map((line, idx) => {
+                let text = line.trim();
+                if (!text.startsWith('•')) text = '• ' + text;
+                else if (!text.startsWith('• ')) text = '• ' + text.substring(1).trim();
+                return { id: Date.now() + idx, text, color: colors[idx] || 'black' };
+            });
         } else {
             delete workingData[activeEditor.dateStr];
         }
@@ -501,9 +518,10 @@
     }
 
     function cancelAction() {
+        hideColorPopup();
         if (activeEditor) {
             if (activeEditor.container) activeEditor.container.style.display = 'block';
-            if (activeEditor.wrap) activeEditor.wrap.remove();
+            if (activeEditor.textarea) activeEditor.textarea.remove();
         }
         activeEditor = null;
         document.getElementById('controlStatus').innerText = "작성 중";
@@ -511,96 +529,116 @@
         renderCalendars();
     }
 
-    /**
-     * 줄 단위 에디터 생성
-     * @param {Array} existingEvents - 기존 이벤트 배열 (없으면 빈 줄 1개)
-     */
-    function buildLineEditor(existingEvents, dateStr) {
-        const wrap = document.createElement('div');
-        wrap.className = 'line-editor-wrap';
+    /* ── 색상 팝업 & 줄별 색상 관리 ─────────────────────────── */
 
-        function makeRow(text, color) {
-            const row = document.createElement('div');
-            row.className = 'line-editor-row';
+    // textarea 내 현재 커서가 몇 번째 줄(0-based)에 있는지 반환
+    function getCurrentLineIndex(textarea) {
+        const text = textarea.value.substring(0, textarea.selectionStart);
+        return text.split('\n').length - 1;
+    }
 
-            // 색상 버튼 3개
-            ['black', 'red', 'blue'].forEach(c => {
-                const btn = document.createElement('button');
-                btn.className = `line-color-btn c-${c}${c === color ? ' active' : ''}`;
-                btn.dataset.color = c;
-                btn.title = c === 'black' ? '검정' : c === 'red' ? '빨강' : '파랑';
-                btn.type = 'button';
-                btn.onclick = (e) => {
-                    e.stopPropagation();
-                    row.querySelectorAll('.line-color-btn').forEach(b => b.classList.remove('active'));
-                    btn.classList.add('active');
-                };
-                row.appendChild(btn);
-            });
+    // 팝업을 textarea 바로 위(day-cell 기준)에 배치
+    function showColorPopup(textarea, lineIdx) {
+        if (!activeEditor) return;
+        const popup = document.getElementById('colorPopup');
+        const cell = textarea.closest('.day-cell');
+        if (!cell) return;
 
-            // 텍스트 입력
-            const inp = document.createElement('input');
-            inp.type = 'text';
-            inp.className = 'line-input';
-            inp.value = text.replace(/^•\s?/, '');
-            inp.placeholder = '일정을 입력하세요...';
-            // Enter → 새 줄 추가
-            inp.addEventListener('keydown', (e) => {
-                if (e.key === 'Enter') {
-                    e.preventDefault();
-                    const newRow = makeRow('', 'black');
-                    row.after(newRow);
-                    newRow.querySelector('.line-input').focus();
-                }
-                // Backspace on empty → 줄 삭제
-                if (e.key === 'Backspace' && inp.value === '') {
-                    e.preventDefault();
-                    const rows = wrap.querySelectorAll('.line-editor-row');
-                    if (rows.length > 1) {
-                        const prev = row.previousElementSibling;
-                        row.remove();
-                        if (prev && prev.classList.contains('line-editor-row')) {
-                            const prevInp = prev.querySelector('.line-input');
-                            if (prevInp) { prevInp.focus(); prevInp.setSelectionRange(prevInp.value.length, prevInp.value.length); }
-                        }
-                    }
-                }
-            });
-            row.appendChild(inp);
+        // cell 위치 기준으로 팝업 절대 위치 계산
+        const cellRect = cell.getBoundingClientRect();
+        const scrollY = window.scrollY || window.pageYOffset;
+        const scrollX = window.scrollX || window.pageXOffset;
 
-            // 줄 삭제 버튼
-            const del = document.createElement('button');
-            del.className = 'line-del-btn';
-            del.type = 'button';
-            del.innerHTML = '<i class="fas fa-times"></i>';
-            del.onclick = (e) => {
-                e.stopPropagation();
-                const rows = wrap.querySelectorAll('.line-editor-row');
-                if (rows.length > 1) row.remove();
-                else inp.value = '';
-            };
-            row.appendChild(del);
+        popup.style.top  = (cellRect.top + scrollY - popup.offsetHeight - 6) + 'px';
+        popup.style.left = (cellRect.left + scrollX) + 'px';
 
-            return row;
+        // 현재 줄 색상으로 버튼 상태 동기화
+        const currentColor = (activeEditor.lineColors && activeEditor.lineColors[lineIdx]) || 'black';
+        popup.querySelectorAll('.cp-btn').forEach(btn => {
+            btn.classList.toggle('selected', btn.dataset.color === currentColor);
+        });
+
+        popup.classList.add('visible');
+
+        // 팝업이 viewport 위로 넘치면 textarea 아래로
+        const popRect = popup.getBoundingClientRect();
+        if (popRect.top < 0) {
+            popup.style.top = (cellRect.bottom + scrollY + 4) + 'px';
         }
+    }
 
-        const initEvents = existingEvents.length > 0 ? existingEvents : [{ text: '', color: 'black' }];
-        initEvents.forEach(ev => wrap.appendChild(makeRow(ev.text || '', ev.color || 'black')));
+    function hideColorPopup() {
+        document.getElementById('colorPopup').classList.remove('visible');
+    }
 
-        // 줄 추가 버튼
-        const addBtn = document.createElement('button');
-        addBtn.className = 'line-add-btn';
-        addBtn.type = 'button';
-        addBtn.innerHTML = '<i class="fas fa-plus mr-1"></i>줄 추가';
-        addBtn.onclick = (e) => {
-            e.stopPropagation();
-            const newRow = makeRow('', 'black');
-            wrap.insertBefore(newRow, addBtn);
-            newRow.querySelector('.line-input').focus();
-        };
-        wrap.appendChild(addBtn);
+    // 색상 버튼 클릭 → 현재 줄 색상 갱신
+    function selectLineColor(color, e) {
+        if (e) e.stopPropagation();
+        if (!activeEditor) return;
+        const textarea = activeEditor.textarea;
+        const lineIdx = getCurrentLineIndex(textarea);
 
-        return wrap;
+        // lineColors 배열 크기를 현재 줄 수에 맞게 확장
+        const lineCount = textarea.value.split('\n').length;
+        while (activeEditor.lineColors.length < lineCount) {
+            activeEditor.lineColors.push('black');
+        }
+        activeEditor.lineColors[lineIdx] = color;
+
+        // 팝업 버튼 상태 갱신
+        document.querySelectorAll('#colorPopup .cp-btn').forEach(btn => {
+            btn.classList.toggle('selected', btn.dataset.color === color);
+        });
+
+        textarea.focus();
+    }
+
+    // textarea 포커스/클릭/커서 이동 시 팝업 위치·색상 갱신
+    function onTextareaFocus(e) {
+        if (!activeEditor) return;
+        const textarea = activeEditor.textarea;
+        const lineIdx = getCurrentLineIndex(textarea);
+        showColorPopup(textarea, lineIdx);
+    }
+
+    // Enter 키: 새 줄 색상을 기본값(black)으로 삽입
+    function onTextareaKeydown(e) {
+        if (!activeEditor) return;
+        if (e.key === 'Enter') {
+            const textarea = activeEditor.textarea;
+            const lineIdx = getCurrentLineIndex(textarea);
+            // 현재 줄 다음에 'black' 삽입
+            activeEditor.lineColors.splice(lineIdx + 1, 0, 'black');
+            // 다음 틱에 팝업 갱신 (커서가 이동한 후)
+            setTimeout(() => {
+                const newLineIdx = getCurrentLineIndex(textarea);
+                showColorPopup(textarea, newLineIdx);
+            }, 0);
+        }
+        // Backspace로 줄 삭제 시 색상 배열도 정리
+        if (e.key === 'Backspace') {
+            const textarea = activeEditor.textarea;
+            const pos = textarea.selectionStart;
+            const textBefore = textarea.value.substring(0, pos);
+            // 줄 맨 앞에서 Backspace → 이전 줄과 합쳐짐
+            if (textBefore.endsWith('\n') || (pos > 0 && textarea.value[pos - 1] === '\n')) {
+                const lineIdx = getCurrentLineIndex(textarea);
+                if (lineIdx > 0) activeEditor.lineColors.splice(lineIdx, 1);
+                setTimeout(() => {
+                    syncLineColors(textarea);
+                    const newLineIdx = getCurrentLineIndex(textarea);
+                    showColorPopup(textarea, newLineIdx);
+                }, 0);
+            }
+        }
+    }
+
+    // 줄 수가 바뀌었을 때 lineColors 배열 길이를 맞춤
+    function syncLineColors(textarea) {
+        if (!activeEditor) return;
+        const lineCount = textarea.value.split('\n').length;
+        while (activeEditor.lineColors.length < lineCount) activeEditor.lineColors.push('black');
+        if (activeEditor.lineColors.length > lineCount) activeEditor.lineColors.length = lineCount;
     }
 
     function changeYear(offset) { displayDate.setFullYear(displayDate.getFullYear() + offset); initData(); }
