@@ -180,7 +180,13 @@
     <div class="p-2 md:p-4 w-full flex-grow">
         <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <div class="calendar-container bg-white rounded-xl border shadow-sm overflow-hidden">
-                <div class="p-5 text-center font-black text-lg bg-slate-50 border-b" id="monthTitle1"></div>
+                <div class="flex items-center justify-between bg-slate-50 border-b px-3 py-4">
+                    <button onclick="changeMonth(-1)" class="w-9 h-9 rounded-full bg-white border border-sky-300 text-sky-700 flex items-center justify-center shadow-sm hover:bg-sky-50 transition-colors" title="이전 달">
+                        <i class="fas fa-chevron-left text-sm"></i>
+                    </button>
+                    <div class="font-black text-lg" id="monthTitle1"></div>
+                    <div class="w-9"></div>
+                </div>
                 <div class="weekday-header">
                     <div class="text-red-600 p-2">일요일</div>
                     <div class="p-2">월요일</div>
@@ -193,7 +199,13 @@
                 <div id="calendarDays1" class="calendar-grid"></div>
             </div>
             <div class="calendar-container bg-white rounded-xl border shadow-sm overflow-hidden">
-                <div class="p-5 text-center font-black text-lg bg-slate-50 border-b" id="monthTitle2"></div>
+                <div class="flex items-center justify-between bg-slate-50 border-b px-3 py-4">
+                    <div class="w-9"></div>
+                    <div class="font-black text-lg" id="monthTitle2"></div>
+                    <button onclick="changeMonth(1)" class="w-9 h-9 rounded-full bg-white border border-sky-300 text-sky-700 flex items-center justify-center shadow-sm hover:bg-sky-50 transition-colors" title="다음 달">
+                        <i class="fas fa-chevron-right text-sm"></i>
+                    </button>
+                </div>
                 <div class="weekday-header">
                     <div class="text-red-600 p-2">일요일</div>
                     <div class="p-2">월요일</div>
