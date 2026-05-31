@@ -149,6 +149,23 @@
 <div id="floatingControls" class="no-print">
     <div class="flex flex-col"><span class="text-[10px] text-slate-500 font-bold">상태</span><span id="controlStatus" class="text-xs font-bold text-sky-700">작성 중</span></div>
     <div class="h-8 w-[1px] bg-slate-200 mx-2"></div>
+    <!-- 색상 선택 -->
+    <div class="flex flex-col items-center gap-1">
+        <span class="text-[10px] text-slate-500 font-bold">색상</span>
+        <div class="flex gap-1.5">
+            <button id="colorBtn-black" onclick="setEventColor('black')"
+                title="검정"
+                class="w-6 h-6 rounded-full border-2 border-slate-400 bg-slate-800 transition-transform hover:scale-110"
+                style="outline:2px solid #0284c7; outline-offset:2px;"></button>
+            <button id="colorBtn-red" onclick="setEventColor('red')"
+                title="빨강"
+                class="w-6 h-6 rounded-full border-2 border-red-300 bg-red-600 transition-transform hover:scale-110"></button>
+            <button id="colorBtn-blue" onclick="setEventColor('blue')"
+                title="파랑"
+                class="w-6 h-6 rounded-full border-2 border-blue-300 bg-blue-600 transition-transform hover:scale-110"></button>
+        </div>
+    </div>
+    <div class="h-8 w-[1px] bg-slate-200 mx-2"></div>
     <button onclick="cancelAction()" class="px-5 py-2 rounded-xl bg-slate-100 text-slate-600 font-bold text-sm">취소</button>
     <button id="confirmBtn" onclick="confirmAction()" class="px-6 py-2 rounded-xl bg-sky-600 text-white font-bold text-sm shadow-lg">저장하기</button>
 </div>
@@ -324,16 +341,21 @@
             if (currentDayOfWeek === 0) dayColorClass = "text-red-600";
             if (currentDayOfWeek === 6) dayColorClass = "text-sky-600";
 
-            let eventsHtml = (workingData[dateStr] || []).map(event => `
-                <div class="event-item group text-slate-700" onclick="editEvent(event, '${dateStr}', ${event.id})">
+            let eventsHtml = (workingData[dateStr] || []).map(event => {
+                const colorStyle =
+                    event.color === 'red'  ? 'color:#dc2626; font-weight:700;' :
+                    event.color === 'blue' ? 'color:#2563eb; font-weight:700;' :
+                                            'color:#1e293b;';
+                return `
+                <div class="event-item group" style="${colorStyle}" onclick="editEvent(event, '${dateStr}', ${event.id})">
                     <span class="event-text">${event.text}</span>
                     <div class="relative delete-container">
                         <button class="ml-1 text-[10px] text-red-400 opacity-0 group-hover:opacity-100 p-1" onclick="askDelete(event, '${dateStr}', ${event.id})">
                             <i class="fas fa-times"></i>
                         </button>
                     </div>
-                </div>
-            `).join('');
+                </div>`;
+            }).join('');
 
             gridElement.innerHTML += `
                 <div class="day-cell group bg-white p-2 hover:bg-slate-50 cursor-pointer ${isToday ? 'today' : ''}" onclick="showInput('${dateStr}', this)">
@@ -398,7 +420,8 @@
 
         cell.querySelector('.input-area').appendChild(textarea);
         textarea.focus();
-        activeEditor = { type: 'new', dateStr, textarea };
+        activeEditor = { type: 'new', dateStr, textarea, color: 'black' };
+        setEventColor('black');
         document.getElementById('floatingControls').classList.add('show');
     }
 
@@ -408,6 +431,7 @@
         closeAllDeletePopups();
         
         const allText = workingData[dateStr].map(ev => ev.text).join('\n');
+        const existingColor = workingData[dateStr][0]?.color || 'black';
         const cell = e.currentTarget.closest('.day-cell');
         const container = cell.querySelector('.events-container');
         container.style.display = 'none';
@@ -428,7 +452,8 @@
         textarea.style.height = 'auto';
         textarea.style.height = (textarea.scrollHeight) + 'px';
 
-        activeEditor = { type: 'edit_all', dateStr, textarea, container };
+        activeEditor = { type: 'edit_all', dateStr, textarea, container, color: existingColor };
+        setEventColor(existingColor);
         document.getElementById('controlStatus').innerText = "수정 중";
         document.getElementById('floatingControls').classList.add('show');
     }
@@ -439,6 +464,7 @@
         
         if (val) {
             const lines = val.split('\n').filter(l => l.trim() !== "");
+            const selectedColor = activeEditor.color || 'black';
             workingData[activeEditor.dateStr] = lines.map((line, idx) => {
                 let text = line.trim();
                 if (!text.startsWith('•')) {
@@ -446,10 +472,10 @@
                 } else if (text.startsWith('•') && !text.startsWith('• ')) {
                     text = '• ' + text.substring(1).trim();
                 }
-                
                 return {
                     id: Date.now() + idx,
-                    text: text
+                    text: text,
+                    color: selectedColor
                 };
             });
         } else {
@@ -469,6 +495,17 @@
         document.getElementById('controlStatus').innerText = "작성 중";
         document.getElementById('floatingControls').classList.remove('show');
         renderCalendars();
+    }
+
+    function setEventColor(color) {
+        if (activeEditor) activeEditor.color = color;
+        ['black', 'red', 'blue'].forEach(c => {
+            const btn = document.getElementById('colorBtn-' + c);
+            if (!btn) return;
+            btn.style.outline = c === color ? '2px solid #0284c7' : 'none';
+            btn.style.outlineOffset = '2px';
+            btn.style.transform = c === color ? 'scale(1.2)' : 'scale(1)';
+        });
     }
 
     function changeYear(offset) { displayDate.setFullYear(displayDate.getFullYear() + offset); initData(); }
@@ -498,6 +535,9 @@
                 if (workingData[dateStr]) {
                     workingData[dateStr].forEach(ev => {
                         const text = ev.text.startsWith('•') ? ev.text : `• ${ev.text}`;
+                        const colorStyle =
+                            ev.color === 'red'  ? 'color:#dc2626; font-weight:700;' :
+                            ev.color === 'blue' ? 'color:#2563eb; font-weight:700;' : '';
 
                         // 바로 전날에 동일 텍스트가 출력됐으면 스킵 (연속 중복)
                         const mm = String(m + 1).padStart(2, '0');
@@ -507,7 +547,7 @@
 
                         const isDuplicate = prevDateStr !== null && lastSeenDate[text] === prevDateStr;
                         if (!isDuplicate) {
-                            weeks[weekIdx] += `<div class="week-content">${text}</div>`;
+                            weeks[weekIdx] += `<div class="week-content" style="${colorStyle}">${text}</div>`;
                         }
                         lastSeenDate[text] = dateStr;
                     });
