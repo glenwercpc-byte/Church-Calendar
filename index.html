@@ -68,6 +68,60 @@
             z-index: 10;
         }
 
+        /* 줄 단위 에디터 */
+        .line-editor-wrap {
+            border: 2px solid #38bdf8;
+            border-radius: 8px;
+            background: #fff;
+            box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1);
+            padding: 4px;
+            z-index: 10;
+        }
+        .line-editor-row {
+            display: flex;
+            align-items: center;
+            gap: 3px;
+            padding: 2px 2px;
+            border-bottom: 1px dashed #e2e8f0;
+        }
+        .line-editor-row:last-child { border-bottom: none; }
+        .line-input {
+            flex: 1;
+            font-size: 0.75rem;
+            line-height: 1.4;
+            border: none;
+            outline: none;
+            padding: 3px 4px;
+            background: transparent;
+            font-family: inherit;
+            min-width: 0;
+        }
+        .line-color-btn {
+            width: 13px; height: 13px;
+            border-radius: 50%;
+            border: 1.5px solid #cbd5e1;
+            cursor: pointer;
+            flex-shrink: 0;
+            transition: transform 0.1s;
+        }
+        .line-color-btn.active { border-color: #0284c7 !important; transform: scale(1.3); }
+        .line-color-btn.c-black { background: #1e293b; }
+        .line-color-btn.c-red   { background: #dc2626; }
+        .line-color-btn.c-blue  { background: #2563eb; }
+        .line-del-btn {
+            font-size: 9px; color: #fca5a5; cursor: pointer;
+            background: none; border: none; padding: 2px; flex-shrink: 0;
+            opacity: 0; transition: opacity 0.15s;
+        }
+        .line-editor-row:hover .line-del-btn { opacity: 1; }
+        .line-add-btn {
+            width: 100%; margin-top: 3px; padding: 3px;
+            font-size: 0.7rem; color: #94a3b8; background: none;
+            border: 1px dashed #cbd5e1; border-radius: 6px; cursor: pointer;
+            transition: all 0.15s;
+        }
+        .line-add-btn:hover { color: #0284c7; border-color: #7dd3fc; background: #f0f9ff; }
+
         #yearPlanOverlay {
             position: fixed; top: 0; left: 0; width: 100%; height: 100%;
             background: white; z-index: 3000; display: none; overflow-y: auto;
@@ -148,23 +202,6 @@
 
 <div id="floatingControls" class="no-print">
     <div class="flex flex-col"><span class="text-[10px] text-slate-500 font-bold">상태</span><span id="controlStatus" class="text-xs font-bold text-sky-700">작성 중</span></div>
-    <div class="h-8 w-[1px] bg-slate-200 mx-2"></div>
-    <!-- 색상 선택 -->
-    <div class="flex flex-col items-center gap-1">
-        <span class="text-[10px] text-slate-500 font-bold">색상</span>
-        <div class="flex gap-1.5">
-            <button id="colorBtn-black" onclick="setEventColor('black')"
-                title="검정"
-                class="w-6 h-6 rounded-full border-2 border-slate-400 bg-slate-800 transition-transform hover:scale-110"
-                style="outline:2px solid #0284c7; outline-offset:2px;"></button>
-            <button id="colorBtn-red" onclick="setEventColor('red')"
-                title="빨강"
-                class="w-6 h-6 rounded-full border-2 border-red-300 bg-red-600 transition-transform hover:scale-110"></button>
-            <button id="colorBtn-blue" onclick="setEventColor('blue')"
-                title="파랑"
-                class="w-6 h-6 rounded-full border-2 border-blue-300 bg-blue-600 transition-transform hover:scale-110"></button>
-        </div>
-    </div>
     <div class="h-8 w-[1px] bg-slate-200 mx-2"></div>
     <button onclick="cancelAction()" class="px-5 py-2 rounded-xl bg-slate-100 text-slate-600 font-bold text-sm">취소</button>
     <button id="confirmBtn" onclick="confirmAction()" class="px-6 py-2 rounded-xl bg-sky-600 text-white font-bold text-sm shadow-lg">저장하기</button>
@@ -408,20 +445,13 @@
     function showInput(dateStr, cell) {
         if (activeEditor) return;
         closeAllDeletePopups();
-        const textarea = document.createElement('textarea');
-        textarea.className = 'calendar-textarea';
-        textarea.placeholder = '일정을 입력하세요...';
-        textarea.onclick = e => e.stopPropagation();
-        
-        textarea.oninput = function() {
-            this.style.height = 'auto';
-            this.style.height = (this.scrollHeight) + 'px';
-        };
-
-        cell.querySelector('.input-area').appendChild(textarea);
-        textarea.focus();
-        activeEditor = { type: 'new', dateStr, textarea, color: 'black' };
-        setEventColor('black');
+        const wrap = buildLineEditor([], dateStr);
+        wrap.onclick = e => e.stopPropagation();
+        cell.querySelector('.input-area').appendChild(wrap);
+        // 첫 번째 줄 input에 포커스
+        const firstInput = wrap.querySelector('.line-input');
+        if (firstInput) firstInput.focus();
+        activeEditor = { type: 'new', dateStr, wrap };
         document.getElementById('floatingControls').classList.add('show');
     }
 
@@ -429,67 +459,51 @@
         e.stopPropagation();
         if (activeEditor) return;
         closeAllDeletePopups();
-        
-        const allText = workingData[dateStr].map(ev => ev.text).join('\n');
-        const existingColor = workingData[dateStr][0]?.color || 'black';
+
+        const existingEvents = workingData[dateStr] || [];
         const cell = e.currentTarget.closest('.day-cell');
         const container = cell.querySelector('.events-container');
         container.style.display = 'none';
 
-        const textarea = document.createElement('textarea');
-        textarea.className = 'calendar-textarea';
-        textarea.value = allText;
-        textarea.onclick = e => e.stopPropagation();
-        
-        textarea.oninput = function() {
-            this.style.height = 'auto';
-            this.style.height = (this.scrollHeight) + 'px';
-        };
+        const wrap = buildLineEditor(existingEvents, dateStr);
+        wrap.onclick = e => e.stopPropagation();
+        cell.querySelector('.input-area').appendChild(wrap);
+        const firstInput = wrap.querySelector('.line-input');
+        if (firstInput) firstInput.focus();
 
-        cell.querySelector('.input-area').appendChild(textarea);
-        textarea.focus();
-        
-        textarea.style.height = 'auto';
-        textarea.style.height = (textarea.scrollHeight) + 'px';
-
-        activeEditor = { type: 'edit_all', dateStr, textarea, container, color: existingColor };
-        setEventColor(existingColor);
+        activeEditor = { type: 'edit_all', dateStr, wrap, container };
         document.getElementById('controlStatus').innerText = "수정 중";
         document.getElementById('floatingControls').classList.add('show');
     }
 
     function confirmAction() {
         if (!activeEditor) return;
-        const val = activeEditor.textarea.value.trim();
-        
-        if (val) {
-            const lines = val.split('\n').filter(l => l.trim() !== "");
-            const selectedColor = activeEditor.color || 'black';
-            workingData[activeEditor.dateStr] = lines.map((line, idx) => {
-                let text = line.trim();
-                if (!text.startsWith('•')) {
-                    text = '• ' + text;
-                } else if (text.startsWith('•') && !text.startsWith('• ')) {
-                    text = '• ' + text.substring(1).trim();
-                }
-                return {
-                    id: Date.now() + idx,
-                    text: text,
-                    color: selectedColor
-                };
-            });
+        const rows = activeEditor.wrap.querySelectorAll('.line-editor-row');
+        const events = [];
+        rows.forEach((row, idx) => {
+            const input = row.querySelector('.line-input');
+            const activeColorBtn = row.querySelector('.line-color-btn.active');
+            let text = input ? input.value.trim() : '';
+            if (!text) return;
+            if (!text.startsWith('•')) text = '• ' + text;
+            else if (!text.startsWith('• ')) text = '• ' + text.substring(1).trim();
+            const color = activeColorBtn ? activeColorBtn.dataset.color : 'black';
+            events.push({ id: Date.now() + idx, text, color });
+        });
+
+        if (events.length > 0) {
+            workingData[activeEditor.dateStr] = events;
         } else {
             delete workingData[activeEditor.dateStr];
         }
-        
-        syncData(); 
+        syncData();
         cancelAction();
     }
 
     function cancelAction() {
         if (activeEditor) {
             if (activeEditor.container) activeEditor.container.style.display = 'block';
-            activeEditor.textarea.remove();
+            if (activeEditor.wrap) activeEditor.wrap.remove();
         }
         activeEditor = null;
         document.getElementById('controlStatus').innerText = "작성 중";
@@ -497,15 +511,96 @@
         renderCalendars();
     }
 
-    function setEventColor(color) {
-        if (activeEditor) activeEditor.color = color;
-        ['black', 'red', 'blue'].forEach(c => {
-            const btn = document.getElementById('colorBtn-' + c);
-            if (!btn) return;
-            btn.style.outline = c === color ? '2px solid #0284c7' : 'none';
-            btn.style.outlineOffset = '2px';
-            btn.style.transform = c === color ? 'scale(1.2)' : 'scale(1)';
-        });
+    /**
+     * 줄 단위 에디터 생성
+     * @param {Array} existingEvents - 기존 이벤트 배열 (없으면 빈 줄 1개)
+     */
+    function buildLineEditor(existingEvents, dateStr) {
+        const wrap = document.createElement('div');
+        wrap.className = 'line-editor-wrap';
+
+        function makeRow(text, color) {
+            const row = document.createElement('div');
+            row.className = 'line-editor-row';
+
+            // 색상 버튼 3개
+            ['black', 'red', 'blue'].forEach(c => {
+                const btn = document.createElement('button');
+                btn.className = `line-color-btn c-${c}${c === color ? ' active' : ''}`;
+                btn.dataset.color = c;
+                btn.title = c === 'black' ? '검정' : c === 'red' ? '빨강' : '파랑';
+                btn.type = 'button';
+                btn.onclick = (e) => {
+                    e.stopPropagation();
+                    row.querySelectorAll('.line-color-btn').forEach(b => b.classList.remove('active'));
+                    btn.classList.add('active');
+                };
+                row.appendChild(btn);
+            });
+
+            // 텍스트 입력
+            const inp = document.createElement('input');
+            inp.type = 'text';
+            inp.className = 'line-input';
+            inp.value = text.replace(/^•\s?/, '');
+            inp.placeholder = '일정을 입력하세요...';
+            // Enter → 새 줄 추가
+            inp.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    const newRow = makeRow('', 'black');
+                    row.after(newRow);
+                    newRow.querySelector('.line-input').focus();
+                }
+                // Backspace on empty → 줄 삭제
+                if (e.key === 'Backspace' && inp.value === '') {
+                    e.preventDefault();
+                    const rows = wrap.querySelectorAll('.line-editor-row');
+                    if (rows.length > 1) {
+                        const prev = row.previousElementSibling;
+                        row.remove();
+                        if (prev && prev.classList.contains('line-editor-row')) {
+                            const prevInp = prev.querySelector('.line-input');
+                            if (prevInp) { prevInp.focus(); prevInp.setSelectionRange(prevInp.value.length, prevInp.value.length); }
+                        }
+                    }
+                }
+            });
+            row.appendChild(inp);
+
+            // 줄 삭제 버튼
+            const del = document.createElement('button');
+            del.className = 'line-del-btn';
+            del.type = 'button';
+            del.innerHTML = '<i class="fas fa-times"></i>';
+            del.onclick = (e) => {
+                e.stopPropagation();
+                const rows = wrap.querySelectorAll('.line-editor-row');
+                if (rows.length > 1) row.remove();
+                else inp.value = '';
+            };
+            row.appendChild(del);
+
+            return row;
+        }
+
+        const initEvents = existingEvents.length > 0 ? existingEvents : [{ text: '', color: 'black' }];
+        initEvents.forEach(ev => wrap.appendChild(makeRow(ev.text || '', ev.color || 'black')));
+
+        // 줄 추가 버튼
+        const addBtn = document.createElement('button');
+        addBtn.className = 'line-add-btn';
+        addBtn.type = 'button';
+        addBtn.innerHTML = '<i class="fas fa-plus mr-1"></i>줄 추가';
+        addBtn.onclick = (e) => {
+            e.stopPropagation();
+            const newRow = makeRow('', 'black');
+            wrap.insertBefore(newRow, addBtn);
+            newRow.querySelector('.line-input').focus();
+        };
+        wrap.appendChild(addBtn);
+
+        return wrap;
     }
 
     function changeYear(offset) { displayDate.setFullYear(displayDate.getFullYear() + offset); initData(); }
