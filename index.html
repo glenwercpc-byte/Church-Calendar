@@ -19,39 +19,16 @@
             font-weight: 600; 
             padding: 2px 4px; 
             cursor: pointer; 
-            display: flex; 
-            justify-content: space-between; 
-            align-items: flex-start; 
+            display: block;
             margin-bottom: 4px;
             word-break: break-all; 
             white-space: normal; 
             position: relative;
+            width: 100%;
         }
-        .event-text { flex: 1; line-height: 1.3; }
+        .event-text { display: block; width: 100%; line-height: 1.3; }
         .today { background-color: #f0f9ff !important; }
         
-        /* 삭제 확인 팝업 스타일 수정: 아이콘 상단에 배치 */
-        .delete-confirm-pop {
-            position: absolute;
-            right: 0;
-            bottom: 100%; /* 부모(버튼 컨테이너)의 위쪽으로 배치 */
-            margin-bottom: 5px; /* 약간의 간격 */
-            background: white;
-            border: 1px solid #fca5a5;
-            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
-            border-radius: 6px;
-            display: flex;
-            align-items: center;
-            gap: 4px;
-            padding: 2px 6px;
-            z-index: 50;
-            animation: fadeIn 0.2s ease-out;
-        }
-        @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(5px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
-
         .calendar-textarea {
             width: 100%;
             min-height: 100px; 
@@ -374,15 +351,7 @@
                     event.color === 'red'  ? 'color:#dc2626; font-weight:700;' :
                     event.color === 'blue' ? 'color:#2563eb; font-weight:700;' :
                                             'color:#1e293b;';
-                return `
-                <div class="event-item group" style="${colorStyle}" onclick="editEvent(event, '${dateStr}', ${event.id})">
-                    <span class="event-text">${event.text}</span>
-                    <div class="relative delete-container">
-                        <button class="ml-1 text-[10px] text-red-400 opacity-0 group-hover:opacity-100 p-1" onclick="askDelete(event, '${dateStr}', ${event.id})">
-                            <i class="fas fa-times"></i>
-                        </button>
-                    </div>
-                </div>`;
+                return `<div class="event-item" style="${colorStyle}" onclick="editEvent(event, '${dateStr}', ${event.id})"><span class="event-text">${event.text}</span></div>`;
             }).join('');
 
             gridElement.innerHTML += `
@@ -401,37 +370,7 @@
         }
     }
 
-    // 삭제 확인 팝업 표시 (위치: 아이콘 상단)
-    function askDelete(e, dateStr, eventId) {
-        e.stopPropagation();
-        closeAllDeletePopups(); 
-        
-        const container = e.currentTarget.parentElement;
-        const pop = document.createElement('div');
-        pop.className = 'delete-confirm-pop';
-        pop.onclick = (ev) => ev.stopPropagation(); 
-        
-        pop.innerHTML = `
-            <span class="text-[9px] font-bold text-red-600 whitespace-nowrap">삭제?</span>
-            <button class="bg-red-500 text-white px-1.5 py-0.5 rounded text-[9px] font-bold" onclick="executeDelete(event, '${dateStr}', ${eventId})">확인</button>
-            <button class="bg-slate-200 text-slate-600 px-1.5 py-0.5 rounded text-[9px] font-bold" onclick="closeAllDeletePopups()">X</button>
-        `;
-        
-        container.appendChild(pop);
-    }
-
-    function closeAllDeletePopups() {
-        const pops = document.querySelectorAll('.delete-confirm-pop');
-        pops.forEach(p => p.remove());
-    }
-
-    function executeDelete(e, dateStr, eventId) {
-        e.stopPropagation();
-        workingData[dateStr] = workingData[dateStr].filter(ev => ev.id !== eventId);
-        if (workingData[dateStr].length === 0) delete workingData[dateStr];
-        syncData(); 
-        renderCalendars();
-    }
+    function closeAllDeletePopups() {}
 
     function showInput(dateStr, cell) {
         if (activeEditor) return;
