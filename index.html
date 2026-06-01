@@ -247,7 +247,7 @@
     /**
      * [중요] 구글 앱스크립트 배포 후 생성된 '웹 앱 URL'을 아래 큰따옴표 안에 입력해야 합니다.
      */
-    const WEB_APP_URL = "https://script.google.com/macros/s/AKfycbyBBI8GtTCh0bYU_AvA7tjQTtEDOPwDTsDgFYw5RgvKdhw6vAXwY7h4rJgcFm-QrNII/exec"; 
+    const WEB_APP_URL = "https://script.google.com/macros/s/AKfycbyRnt29M1kGQPbXWahm4dQD5ZEEcnAeLzKQKs3dhKqEu0-xRMSLbqG1pdAy6ihOB6zy/exec"; 
     
     let displayDate = new Date(); 
     let workingData = {}; 
@@ -581,7 +581,11 @@
     }
 
     function changeYear(offset) { displayDate.setFullYear(displayDate.getFullYear() + offset); initData(); }
-    function changeMonth(offset) { displayDate.setMonth(displayDate.getMonth() + offset); initData(); }
+    function changeMonth(offset) {
+        displayDate.setMonth(displayDate.getMonth() + offset);
+        document.getElementById('currentMonthLabel').innerText = monthNames[displayDate.getMonth()];
+        renderCalendars();
+    }
     
     function showYearPlan() {
         const body = document.getElementById('yearPlanBody');
@@ -735,7 +739,7 @@
                 displayDate.setMonth(i);
                 document.getElementById('currentMonthLabel').innerText = monthNames[i];
                 closeMonthPicker();
-                initData();
+                renderCalendars();
             };
             grid.appendChild(btn);
         }
