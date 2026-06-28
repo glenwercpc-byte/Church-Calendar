@@ -28,6 +28,7 @@
         }
         .event-text { display: block; width: 100%; line-height: 1.3; }
         .today { background-color: #f0f9ff !important; }
+        .pending-edit { box-shadow: inset 0 0 0 2px #fbbf24; background-color: #fffbeb !important; }
         
         .calendar-textarea {
             width: 100%;
@@ -169,8 +170,16 @@
 </div>
 
 <div id="floatingControls" class="no-print">
-    <div class="flex flex-col"><span class="text-[10px] text-slate-500 font-bold">상태</span><span id="controlStatus" class="text-xs font-bold text-sky-700">작성 중</span></div>
+    <div class="flex flex-col">
+        <span class="text-[10px] text-slate-500 font-bold">상태</span>
+        <span id="controlStatus" class="text-xs font-bold text-sky-700">작성 중</span>
+    </div>
+    <div id="pendingBadge" class="hidden flex flex-col items-center px-2">
+        <span class="text-[10px] text-amber-500 font-bold">대기중</span>
+        <span id="pendingCount" class="text-xs font-bold text-amber-600">0건</span>
+    </div>
     <div class="h-8 w-[1px] bg-slate-200 mx-2"></div>
+    <button onclick="continueEditing()" class="px-4 py-2 rounded-xl bg-indigo-100 text-indigo-700 font-bold text-sm">연속 수정</button>
     <button onclick="cancelAction()" class="px-5 py-2 rounded-xl bg-slate-100 text-slate-600 font-bold text-sm">취소</button>
     <button id="confirmBtn" onclick="confirmAction()" class="px-6 py-2 rounded-xl bg-sky-600 text-white font-bold text-sm shadow-lg">저장하기</button>
 </div>
@@ -247,11 +256,12 @@
     /**
      * [중요] 구글 앱스크립트 배포 후 생성된 '웹 앱 URL'을 아래 큰따옴표 안에 입력해야 합니다.
      */
-    const WEB_APP_URL = "https://script.google.com/macros/s/AKfycbyRnt29M1kGQPbXWahm4dQD5ZEEcnAeLzKQKs3dhKqEu0-xRMSLbqG1pdAy6ihOB6zy/exec"; 
+    const WEB_APP_URL = "https://script.google.com/macros/s/AKfycbwVjLMLQzfbtDPtq1PeTc1UHWFdSVz7fGz4Xyrso2b1uXA0F2YncGtV9qBi41UJtfbJ/exec"; 
     
     let displayDate = new Date(); 
     let workingData = {}; 
     let activeEditor = null;
+    let pendingDates = new Set(); // 연속 수정으로 임시 반영되었지만 서버에는 아직 저장 안 된 날짜들
     const monthNames = ["1월", "2월", "3월", "4월", "5월", "6월", "7월", "8월", "9월", "10월", "11월", "12월"];
 
     async function initData() {
@@ -354,9 +364,10 @@
                 return `<div class="event-item" style="${colorStyle}" onclick="editEvent(event, '${dateStr}', ${event.id})"><span class="event-text">${event.text}</span></div>`;
             }).join('');
 
+            const isPending = pendingDates.has(dateStr);
             gridElement.innerHTML += `
-                <div class="day-cell group bg-white p-2 hover:bg-slate-50 cursor-pointer ${isToday ? 'today' : ''}" onclick="showInput('${dateStr}', this)">
-                    <div class="text-xs font-bold mb-1"><span class="${isToday ? 'bg-sky-600 text-white px-1.5 py-0.5 rounded-full' : dayColorClass}">${i}</span></div>
+                <div class="day-cell group bg-white p-2 hover:bg-slate-50 cursor-pointer ${isToday ? 'today' : ''} ${isPending ? 'pending-edit' : ''}" onclick="showInput('${dateStr}', this)">
+                    <div class="text-xs font-bold mb-1 flex items-center gap-1"><span class="${isToday ? 'bg-sky-600 text-white px-1.5 py-0.5 rounded-full' : dayColorClass}">${i}</span>${isPending ? '<span class="text-[9px] text-amber-500"><i class="fas fa-circle"></i></span>' : ''}</div>
                     <div class="input-area"></div>
                     <div class="events-container overflow-y-auto max-h-[120px]">${eventsHtml}</div>
                 </div>
@@ -373,7 +384,10 @@
     function closeAllDeletePopups() {}
 
     function showInput(dateStr, cell) {
-        if (activeEditor) return;
+        if (activeEditor) {
+            if (activeEditor.dateStr === dateStr) return; // 같은 날짜 재클릭은 무시
+            continueEditing(); // 다른 날짜를 클릭하면 현재 편집 내용을 자동으로 임시 반영하고 이동
+        }
         closeAllDeletePopups();
 
         const textarea = document.createElement('textarea');
@@ -399,7 +413,10 @@
 
     function editEvent(e, dateStr, eventId) {
         e.stopPropagation();
-        if (activeEditor) return;
+        if (activeEditor) {
+            if (activeEditor.dateStr === dateStr) return; // 같은 날짜 재클릭은 무시
+            continueEditing();
+        }
         closeAllDeletePopups();
 
         const existingEvents = workingData[dateStr] || [];
@@ -435,25 +452,65 @@
         document.getElementById('floatingControls').classList.add('show');
     }
 
-    function confirmAction() {
-        if (!activeEditor) return;
+    // 현재 열려있는 textarea 내용을 workingData에 반영 (서버 전송은 하지 않음)
+    function applyCurrentEditorToData() {
+        if (!activeEditor) return null;
         const val = activeEditor.textarea.value.trim();
+        const dateStr = activeEditor.dateStr;
         hideColorPopup();
 
         if (val) {
             const lines = val.split('\n').filter(l => l.trim() !== '');
             const colors = activeEditor.lineColors || [];
-            workingData[activeEditor.dateStr] = lines.map((line, idx) => {
+            workingData[dateStr] = lines.map((line, idx) => {
                 let text = line.trim();
                 if (!text.startsWith('•')) text = '• ' + text;
                 else if (!text.startsWith('• ')) text = '• ' + text.substring(1).trim();
                 return { id: Date.now() + idx, text, color: colors[idx] || 'black' };
             });
         } else {
-            delete workingData[activeEditor.dateStr];
+            delete workingData[dateStr];
         }
+
+        if (activeEditor.container) activeEditor.container.style.display = 'block';
+        if (activeEditor.textarea) activeEditor.textarea.remove();
+        activeEditor = null;
+        return dateStr;
+    }
+
+    function updatePendingBadge() {
+        const badge = document.getElementById('pendingBadge');
+        const count = document.getElementById('pendingCount');
+        if (pendingDates.size > 0) {
+            count.innerText = pendingDates.size + '건';
+            badge.classList.remove('hidden');
+        } else {
+            badge.classList.add('hidden');
+        }
+    }
+
+    // "연속 수정": 현재 날짜 내용을 임시 반영하고, 에디터를 닫되 floatingControls는 계속 표시 → 다른 날짜 계속 편집 가능
+    function continueEditing() {
+        const dateStr = applyCurrentEditorToData();
+        if (dateStr) pendingDates.add(dateStr);
+        updatePendingBadge();
+        document.getElementById('controlStatus').innerText = "연속 수정 중";
+        renderCalendars();
+        // floatingControls는 계속 표시 상태 유지 (show 유지)
+    }
+
+    // "저장하기": 현재 편집 중인 날짜까지 포함해 전체를 서버에 1회 동기화
+    function confirmAction() {
+        const dateStr = applyCurrentEditorToData();
+        if (dateStr) pendingDates.add(dateStr);
+
         syncData();
-        cancelAction();
+        pendingDates.clear();
+        updatePendingBadge();
+        activeEditor = null;
+        document.getElementById('controlStatus').innerText = "작성 중";
+        document.getElementById('floatingControls').classList.remove('show');
+        renderCalendars();
     }
 
     function cancelAction() {
@@ -465,7 +522,15 @@
         activeEditor = null;
         document.getElementById('controlStatus').innerText = "작성 중";
         document.getElementById('floatingControls').classList.remove('show');
-        renderCalendars();
+
+        if (pendingDates.size > 0) {
+            // 연속 수정으로 임시 반영된 내용까지 전부 취소 → 서버 데이터로 되돌림
+            pendingDates.clear();
+            updatePendingBadge();
+            initData();
+        } else {
+            renderCalendars();
+        }
     }
 
     /* ── 색상 팝업 & 줄별 색상 관리 ─────────────────────────── */
