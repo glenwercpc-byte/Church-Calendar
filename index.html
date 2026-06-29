@@ -139,7 +139,7 @@
 <div id="loadingOverlay">
     <div class="flex flex-col items-center gap-2">
         <i class="fas fa-spinner fa-spin text-3xl"></i>
-        <span id="loadingText">데이터를 동기화 중...</span>
+        <span id="loadingText">데이터 입력중입니다</span>
     </div>
 </div>
 
@@ -385,7 +385,11 @@
     function showInput(dateStr, cell) {
         if (activeEditor) {
             if (activeEditor.dateStr === dateStr) return; // 같은 날짜 재클릭은 무시
+            const prevTextarea = activeEditor.textarea;
+            const prevCell = prevTextarea ? prevTextarea.closest('.day-cell') : null;
+            const prevDateStr = activeEditor.dateStr;
             continueEditing(); // 다른 날짜를 클릭하면 현재 편집 내용을 자동으로 임시 반영하고 이동
+            if (prevCell) markCellAsPending(prevCell, prevDateStr);
         }
         closeAllDeletePopups();
 
@@ -414,7 +418,11 @@
         e.stopPropagation();
         if (activeEditor) {
             if (activeEditor.dateStr === dateStr) return; // 같은 날짜 재클릭은 무시
+            const prevTextarea = activeEditor.textarea;
+            const prevCell = prevTextarea ? prevTextarea.closest('.day-cell') : null;
+            const prevDateStr = activeEditor.dateStr;
             continueEditing();
+            if (prevCell) markCellAsPending(prevCell, prevDateStr);
         }
         closeAllDeletePopups();
 
@@ -477,6 +485,31 @@
         return dateStr;
     }
 
+    // 특정 day-cell DOM에 '대기중' 표시를 직접 추가 (전체 리렌더 없이)
+    function markCellAsPending(cellEl, dateStr) {
+        if (!cellEl) return;
+        cellEl.classList.add('pending-edit');
+        const labelRow = cellEl.querySelector('.text-xs.font-bold.mb-1');
+        if (labelRow && !labelRow.querySelector('.pending-dot')) {
+            const dot = document.createElement('span');
+            dot.className = 'pending-dot text-[9px] text-amber-500';
+            dot.innerHTML = '<i class="fas fa-circle"></i>';
+            labelRow.appendChild(dot);
+        }
+        // 해당 날짜의 최신 일정 내용도 다시 그려줌 (수정한 내용이 바로 보이도록)
+        const eventsContainer = cellEl.querySelector('.events-container');
+        if (eventsContainer && dateStr) {
+            eventsContainer.innerHTML = (workingData[dateStr] || []).map(event => {
+                const colorStyle =
+                    event.color === 'red'  ? 'color:#dc2626; font-weight:700;' :
+                    event.color === 'blue' ? 'color:#2563eb; font-weight:700;' :
+                                            'color:#1e293b;';
+                return `<div class="event-item" style="${colorStyle}" onclick="editEvent(event, '${dateStr}', ${event.id})"><span class="event-text">${event.text}</span></div>`;
+            }).join('');
+            eventsContainer.style.display = 'block';
+        }
+    }
+
     function updatePendingBadge() {
         const badge = document.getElementById('pendingBadge');
         const count = document.getElementById('pendingCount');
@@ -488,14 +521,13 @@
         }
     }
 
-    // "연속 수정": 현재 날짜 내용을 임시 반영하고, 에디터를 닫되 floatingControls는 계속 표시 → 다른 날짜 계속 편집 가능
+    // "연속 수정": 현재 날짜 내용을 임시 반영. 화면 갱신은 호출한 쪽(showInput/editEvent)이 마무리 후 처리
     function continueEditing() {
         const dateStr = applyCurrentEditorToData();
         if (dateStr) pendingDates.add(dateStr);
         updatePendingBadge();
         document.getElementById('controlStatus').innerText = "연속 수정 중";
-        renderCalendars();
-        // floatingControls는 계속 표시 상태 유지 (show 유지)
+        // renderCalendars()는 여기서 호출하지 않음 — 호출한 쪽의 cell 참조가 끊기기 때문
     }
 
     // "저장하기": 현재 편집 중인 날짜까지 포함해 전체를 서버에 1회 동기화
